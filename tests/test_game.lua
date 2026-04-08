@@ -101,4 +101,58 @@ function Tests.apply_resolution_updates_selected_option()
   assert_equal(game.selected_resolution_id, "res_700_700", "Selected resolution should not change on failure")
 end
 
+function Tests.main_menu_keyboard_shortcuts()
+  local game = Game.new()
+
+  game:keypressed("p")
+  assert_equal(game.screen, "play_menu", "P key should open play menu")
+
+  game.screen = "main_menu"
+  game:keypressed("s")
+  assert_equal(game.screen, "settings_menu", "S key should open settings menu")
+end
+
+function Tests.play_menu_keyboard_shortcuts()
+  local game = Game.new()
+  game.screen = "play_menu"
+
+  game:keypressed("5")
+  game:keypressed("e")
+  game:keypressed("return")
+
+  assert_equal(game.screen, "playing", "Enter should start game from play menu")
+  assert_equal(game.state.width, 5, "Board size hotkey should be applied")
+  assert_equal(game.bot_difficulty, "easy", "Difficulty hotkey should be applied")
+end
+
+function Tests.settings_menu_keyboard_shortcuts()
+  local game = Game.new()
+  game.screen = "settings_menu"
+
+  game:keypressed("1")
+  assert_equal(game.selected_resolution_id, "res_700_700", "1 should pick smallest resolution")
+  game:keypressed("3")
+  assert_equal(game.selected_resolution_id, "res_960_800", "3 should pick largest resolution")
+end
+
+function Tests.playing_keyboard_cursor_can_select_and_move()
+  local game = Game.new()
+  game:start_game(7, "hard")
+
+  assert_equal(game.cursor_cell.x, 1, "Cursor should start on first player piece")
+  assert_equal(game.cursor_cell.y, 1, "Cursor should start on first player piece")
+
+  game:keypressed("return")
+  assert_equal(game.state.selected_cell.x, 1, "Enter should select piece at cursor")
+  assert_equal(game.state.selected_cell.y, 1, "Enter should select piece at cursor")
+
+  game:keypressed("right")
+  assert_equal(game.cursor_cell.x, 2, "Arrow key should move cursor")
+  assert_equal(game.cursor_cell.y, 1, "Arrow key should move cursor")
+
+  game:keypressed("space")
+  assert_equal(board.get_cell(game.state, 2, 1), "player", "Space should execute legal move from selected piece")
+  assert_equal(game.state.current_player, "enemy", "After player move it should become enemy turn")
+end
+
 return Tests

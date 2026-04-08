@@ -510,10 +510,15 @@ function Render.get_layout(width, height, state)
   }
 end
 
-function Render.draw(state)
+function Render.draw(state, view)
   local width, height = love.graphics.getDimensions()
   local layout = Render.get_layout(width, height, state)
   local move_lookup = build_move_lookup(state)
+  local cursor_cell = nil
+
+  if view and view.cursor_cell then
+    cursor_cell = view.cursor_cell
+  end
 
   draw_background(width, height)
   draw_progress_bar(state, layout)
@@ -563,6 +568,7 @@ function Render.draw(state)
       local move_kind = move_lookup[cell_key(x, y)]
       local is_selected = state.selected_cell and board.same_cell(state.selected_cell, { x = x, y = y })
       local is_last_move = state.last_move and board.same_cell(state.last_move.to, { x = x, y = y })
+      local is_cursor = cursor_cell and cursor_cell.x == x and cursor_cell.y == y
 
       set_color(palette.cell)
       love.graphics.rectangle("fill", px + 3, py + 3, size - 6, size - 6, 16, 16)
@@ -586,6 +592,10 @@ function Render.draw(state)
         set_color(palette.selected)
         love.graphics.setLineWidth(3)
         love.graphics.rectangle("line", px + 5, py + 5, size - 10, size - 10, 16, 16)
+      elseif is_cursor and not state.winner then
+        set_color(palette.text_muted)
+        love.graphics.setLineWidth(2)
+        love.graphics.rectangle("line", px + 10, py + 10, size - 20, size - 20, 14, 14)
       elseif is_last_move then
         set_color(palette.text_muted)
         love.graphics.setLineWidth(2)

@@ -22,6 +22,10 @@ local function point_in_rect(x, y, rect)
     and y <= rect.y + rect.height
 end
 
+local function is_confirm_key(key)
+  return key == "return" or key == "kpenter" or key == "space"
+end
+
 local function find_resolution_option(id)
   for _, option in ipairs(RESOLUTION_OPTIONS) do
     if option.id == id then
@@ -30,6 +34,18 @@ local function find_resolution_option(id)
   end
 
   return nil
+end
+
+local function find_first_player_cell(state)
+  for y = 1, state.height do
+    for x = 1, state.width do
+      if board.get_cell(state, x, y) == "player" then
+        return { x = x, y = y }
+      end
+    end
+  end
+
+  return { x = 1, y = 1 }
 end
 
 function Game.new()
@@ -44,6 +60,7 @@ function Game.new()
   self.selected_bot_difficulty = "hard"
   self.bot_difficulty = "hard"
   self.selected_resolution_id = DEFAULT_RESOLUTION_ID
+  self.cursor_cell = nil
 
   return self
 end
@@ -58,6 +75,7 @@ function Game:start_game(board_size, bot_difficulty)
   self.state = rules.resolve_state(level.load(size))
   self.screen = "playing"
   self.ai_timer = 0
+  self.cursor_cell = find_first_player_cell(self.state)
 end
 
 function Game:apply_resolution(option_id)
@@ -90,6 +108,7 @@ function Game:restart()
 
   self.state = rules.resolve_state(level.load(self.board_size))
   self.ai_timer = 0
+  self.cursor_cell = find_first_player_cell(self.state)
 end
 
 function Game:commit_move(move)
@@ -182,6 +201,64 @@ function Game:handle_settings_menu_click(x, y)
   end
 
   self:apply_resolution(button_id)
+end
+
+function Game:move_cursor(dx, dy)
+  if self.screen ~= "playing" or not self.state then
+    return
+  end
+
+  if not self.cursor_cell then
+    self.cursor_cell = find_first_player_cell(self.state)
+  end
+
+  local next_x = self.cursor_cell.x + dx
+  local next_y = self.cursor_cell.y + dy
+
+  if next_x < 1 then
+    next_x = 1
+  elseif next_x > self.state.width then
+    next_x = self.state.width
+  end
+
+  if next_y < 1 then
+    next_y = 1
+  elseif next_y > self.state.height then
+    next_y = self.state.height
+  end
+
+  self.cursor_cell = { x = next_x, y = next_y }
+end
+
+function Game:activate_cursor_cell()
+  if self.screen ~= "playing" or not self.state or not self.cursor_cell then
+    return
+  end
+
+  if self.state.winner or self.state.current_player ~= "player" then
+    return
+  end
+
+  local cell = self.cursor_cell
+
+  if self.state.selected_cell then
+    local selected_move = rules.find_move(self.state, "player", self.state.selected_cell, cell)
+
+    if selected_move then
+      self:commit_move(selected_move)
+      return
+    end
+  end
+
+  if board.get_cell(self.state, cell.x, cell.y) == "player" then
+    if board.same_cell(self.state.selected_cell, cell) then
+      self.state.selected_cell = nil
+    else
+      self.state.selected_cell = { x = cell.x, y = cell.y }
+    end
+  else
+    self.state.selected_cell = nil
+  end
 end
 
 function Game:run_enemy_turn()
@@ -283,6 +360,8 @@ function Game:mousepressed(x, y, button)
     return
   end
 
+  self.cursor_cell = { x = cell.x, y = cell.y }
+
   if self.state.selected_cell then
     local selected_move = rules.find_move(self.state, "player", self.state.selected_cell, cell)
 
@@ -305,6 +384,16 @@ end
 
 function Game:keypressed(key)
   if self.screen == "main_menu" then
+    if key == "p" or is_confirm_key(key) then
+      self.screen = "play_menu"
+      return
+    end
+
+    if key == "s" then
+      self.screen = "settings_menu"
+      return
+    end
+
     if input.is_quit_key(key) then
       love.event.quit()
     end
@@ -312,6 +401,36 @@ function Game:keypressed(key)
   end
 
   if self.screen == "play_menu" then
+    if key == "5" then
+      self.selected_board_size = 5
+      return
+    end
+
+    if key == "7" then
+      self.selected_board_size = 7
+      return
+    end
+
+    if key == "9" then
+      self.selected_board_size = 9
+      return
+    end
+
+    if key == "e" then
+      self.selected_bot_difficulty = "easy"
+      return
+    end
+
+    if key == "h" then
+      self.selected_bot_difficulty = "hard"
+      return
+    end
+
+    if is_confirm_key(key) then
+      self:start_game(self.selected_board_size, self.selected_bot_difficulty)
+      return
+    end
+
     if input.is_quit_key(key) then
       self.screen = "main_menu"
     end
@@ -319,9 +438,49 @@ function Game:keypressed(key)
   end
 
   if self.screen == "settings_menu" then
+    if key == "1" then
+      self:apply_resolution("res_700_700")
+      return
+    end
+
+    if key == "2" then
+      self:apply_resolution("res_840_760")
+      return
+    end
+
+    if key == "3" then
+      self:apply_resolution("res_960_800")
+      return
+    end
+
     if input.is_quit_key(key) then
       self.screen = "main_menu"
     end
+    return
+  end
+
+  if key == "up" or key == "w" then
+    self:move_cursor(0, -1)
+    return
+  end
+
+  if key == "down" or key == "s" then
+    self:move_cursor(0, 1)
+    return
+  end
+
+  if key == "left" or key == "a" then
+    self:move_cursor(-1, 0)
+    return
+  end
+
+  if key == "right" or key == "d" then
+    self:move_cursor(1, 0)
+    return
+  end
+
+  if is_confirm_key(key) then
+    self:activate_cursor_cell()
     return
   end
 
@@ -334,6 +493,7 @@ function Game:keypressed(key)
     self.screen = "main_menu"
     self.state = nil
     self.ai_timer = 0
+    self.cursor_cell = nil
   end
 end
 
@@ -354,7 +514,9 @@ function Game:draw()
   end
 
   if self.state then
-    render.draw(self.state)
+    render.draw(self.state, {
+      cursor_cell = self.cursor_cell,
+    })
   end
 end
 

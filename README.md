@@ -33,8 +33,12 @@ luajit tests/run.lua
 
 - Main menu: click `Play`, choose `5x5`, `7x7`, or `9x9`, pick bot difficulty (`Easy` or `Hard`), then click `Start`.
 - Main menu: click `Settings` to choose window resolution (`700x700`, `840x760`, `960x800`).
+- Main menu keyboard: `P` opens Play, `S` opens Settings, `Esc` quits.
+- Play menu keyboard: `5`/`7`/`9` choose board size, `E`/`H` choose bot difficulty, `Enter` starts, `Esc` goes back.
+- Settings keyboard: `1`/`2`/`3` choose resolution, `Esc` goes back.
 - Left click one of your bacteria to select it.
 - Left click a highlighted cell to move.
+- In game keyboard: `Arrow keys` or `WASD` move the cursor, `Enter`/`Space` select and move.
 - `R` restarts the board.
 - `Esc` returns to the main menu.
 - `Esc` on the main menu quits.
