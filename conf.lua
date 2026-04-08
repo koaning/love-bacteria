@@ -4,8 +4,8 @@ function love.conf(t)
   t.console = false
 
   t.window.title = "Bacteria Prototype"
-  t.window.width = 960
-  t.window.height = 720
+  t.window.width = 840
+  t.window.height = 760
   t.window.resizable = false
   t.window.vsync = 1
   t.window.msaa = 4

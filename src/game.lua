@@ -9,11 +9,11 @@ local Game = {}
 Game.__index = Game
 
 local RESOLUTION_OPTIONS = {
-  { id = "res_800_600", width = 800, height = 600 },
-  { id = "res_960_720", width = 960, height = 720 },
-  { id = "res_1280_900", width = 1280, height = 900 },
+  { id = "res_700_700", width = 700, height = 700 },
+  { id = "res_840_760", width = 840, height = 760 },
+  { id = "res_960_800", width = 960, height = 800 },
 }
-local DEFAULT_RESOLUTION_ID = "res_960_720"
+local DEFAULT_RESOLUTION_ID = "res_840_760"
 
 local function point_in_rect(x, y, rect)
   return x >= rect.x

@@ -87,18 +87,18 @@ function Tests.new_starts_in_main_menu_with_default_resolution()
   local game = Game.new()
 
   assert_equal(game.screen, "main_menu", "Game should start on main menu")
-  assert_equal(game.selected_resolution_id, "res_960_720", "Default resolution should be 960x720")
+  assert_equal(game.selected_resolution_id, "res_840_760", "Default resolution should be 840x760")
   assert_equal(game.selected_bot_difficulty, "hard", "Default selected bot difficulty should be hard")
 end
 
 function Tests.apply_resolution_updates_selected_option()
   local game = Game.new()
 
-  assert_equal(game:apply_resolution("res_800_600"), true, "Known resolution should apply")
-  assert_equal(game.selected_resolution_id, "res_800_600", "Selected resolution should update")
+  assert_equal(game:apply_resolution("res_700_700"), true, "Known resolution should apply")
+  assert_equal(game.selected_resolution_id, "res_700_700", "Selected resolution should update")
 
   assert_equal(game:apply_resolution("res_missing"), false, "Unknown resolution should fail")
-  assert_equal(game.selected_resolution_id, "res_800_600", "Selected resolution should not change on failure")
+  assert_equal(game.selected_resolution_id, "res_700_700", "Selected resolution should not change on failure")
 end
 
 return Tests
