@@ -44,7 +44,25 @@ function Game:run_enemy_turn()
   self:commit_move(move)
 end
 
+function Game:resolve_forced_pass()
+  if self.state.winner then
+    return
+  end
+
+  local active_side = self.state.current_player
+  local active_moves = rules.get_legal_moves(self.state, active_side)
+
+  if #active_moves > 0 then
+    return
+  end
+
+  self.state = rules.resolve_state(self.state)
+  self.ai_timer = 0
+end
+
 function Game:update(dt)
+  self:resolve_forced_pass()
+
   if self.state.winner then
     return
   end

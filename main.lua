@@ -6,7 +6,7 @@ local game
 function love.load()
   love.math.setRandomSeed(os.time())
   love.graphics.setLineStyle("smooth")
-  love.graphics.setLineJoin("round")
+  love.graphics.setLineJoin("bevel")
 
   render.load()
   game = Game.new()

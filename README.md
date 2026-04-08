@@ -15,6 +15,19 @@ love .
 ```
 
 On macOS, if `love` is not on your `PATH`, launch the `.app` and open this folder as a project or add the CLI wrapper manually.
+If macOS blocks `love` with a developer verification warning, remove quarantine first:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/love.app
+```
+
+## Tests
+
+Run the lightweight Lua test suite:
+
+```bash
+luajit tests/run.lua
+```
 
 ## Controls
 
