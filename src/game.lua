@@ -41,15 +41,20 @@ function Game.new()
   self.screen = "main_menu"
   self.selected_board_size = 7
   self.board_size = 7
+  self.selected_bot_difficulty = "hard"
+  self.bot_difficulty = "hard"
   self.selected_resolution_id = DEFAULT_RESOLUTION_ID
 
   return self
 end
 
-function Game:start_game(board_size)
+function Game:start_game(board_size, bot_difficulty)
   local size = board_size or self.selected_board_size or 7
+  local difficulty = bot_difficulty or self.selected_bot_difficulty or "hard"
   self.selected_board_size = size
+  self.selected_bot_difficulty = difficulty
   self.board_size = size
+  self.bot_difficulty = difficulty
   self.state = rules.resolve_state(level.load(size))
   self.screen = "playing"
   self.ai_timer = 0
@@ -142,13 +147,23 @@ function Game:handle_play_menu_click(x, y)
     return
   end
 
+  if button_id == "difficulty_easy" then
+    self.selected_bot_difficulty = "easy"
+    return
+  end
+
+  if button_id == "difficulty_hard" then
+    self.selected_bot_difficulty = "hard"
+    return
+  end
+
   if button_id == "back" then
     self.screen = "main_menu"
     return
   end
 
   if button_id == "start" then
-    self:start_game(self.selected_board_size)
+    self:start_game(self.selected_board_size, self.selected_bot_difficulty)
   end
 end
 
@@ -178,7 +193,7 @@ function Game:run_enemy_turn()
     return
   end
 
-  local move = ai.choose_move(self.state, "enemy")
+  local move = ai.choose_move(self.state, "enemy", self.bot_difficulty)
 
   if not move then
     self.state = rules.resolve_state(self.state)
@@ -329,7 +344,7 @@ function Game:draw()
   end
 
   if self.screen == "play_menu" then
-    render.draw_play_menu(self.selected_board_size)
+    render.draw_play_menu(self.selected_board_size, self.selected_bot_difficulty)
     return
   end
 

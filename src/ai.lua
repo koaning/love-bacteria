@@ -76,8 +76,26 @@ local function score_move(state, side, move)
     + center_bonus(move.to.x, move.to.y, state.width, state.height)
 end
 
-function AI.choose_move(state, side)
+local function random_index(maximum)
+  if love and love.math and love.math.random then
+    return love.math.random(maximum)
+  end
+
+  return math.random(maximum)
+end
+
+function AI.choose_move(state, side, difficulty)
   local legal_moves = rules.get_legal_moves(state, side)
+  local bot_difficulty = difficulty or "hard"
+
+  if #legal_moves == 0 then
+    return nil
+  end
+
+  if bot_difficulty == "easy" then
+    return legal_moves[random_index(#legal_moves)]
+  end
+
   local best_move = nil
   local best_score = nil
 

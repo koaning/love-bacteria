@@ -233,14 +233,14 @@ end
 
 function Render.get_play_menu_ui(width, height)
   local panel_width = 520
-  local panel_height = 330
+  local panel_height = 410
   local panel_x = math.floor((width - panel_width) * 0.5)
   local panel_y = math.floor((height - panel_height) * 0.5)
   local option_width = 120
   local option_height = 54
   local gap = 20
   local options_x = panel_x + math.floor((panel_width - ((option_width * 3) + (gap * 2))) * 0.5)
-  local options_y = panel_y + 130
+  local options_y = panel_y + 116
 
   return {
     panel = {
@@ -275,10 +275,26 @@ function Render.get_play_menu_ui(width, height)
         height = option_height,
       },
       {
+        id = "difficulty_easy",
+        label = "Easy",
+        x = panel_x + 110,
+        y = panel_y + 246,
+        width = 140,
+        height = 50,
+      },
+      {
+        id = "difficulty_hard",
+        label = "Hard",
+        x = panel_x + panel_width - 250,
+        y = panel_y + 246,
+        width = 140,
+        height = 50,
+      },
+      {
         id = "back",
         label = "Back",
         x = panel_x + 56,
-        y = panel_y + 242,
+        y = panel_y + 334,
         width = 180,
         height = 50,
       },
@@ -286,7 +302,7 @@ function Render.get_play_menu_ui(width, height)
         id = "start",
         label = "Start",
         x = panel_x + panel_width - 236,
-        y = panel_y + 242,
+        y = panel_y + 334,
         width = 180,
         height = 50,
       },
@@ -405,7 +421,7 @@ function Render.draw_main_menu()
   end
 end
 
-function Render.draw_play_menu(selected_size)
+function Render.draw_play_menu(selected_size, selected_difficulty)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_play_menu_ui(width, height)
 
@@ -418,7 +434,8 @@ function Render.draw_play_menu(selected_size)
 
   love.graphics.setFont(fonts.body)
   set_color(palette.text_muted)
-  love.graphics.printf("Board Size", ui.panel.x, ui.panel.y + 92, ui.panel.width, "center")
+  love.graphics.printf("Board Size", ui.panel.x, ui.panel.y + 78, ui.panel.width, "center")
+  love.graphics.printf("Bot Difficulty", ui.panel.x, ui.panel.y + 208, ui.panel.width, "center")
 
   for _, button in ipairs(ui.buttons) do
     local active = false
@@ -429,6 +446,10 @@ function Render.draw_play_menu(selected_size)
       active = selected_size == 7
     elseif button.id == "size_9" then
       active = selected_size == 9
+    elseif button.id == "difficulty_easy" then
+      active = selected_difficulty == "easy"
+    elseif button.id == "difficulty_hard" then
+      active = selected_difficulty == "hard"
     end
 
     draw_button(button, active)

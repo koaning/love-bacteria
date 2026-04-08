@@ -73,11 +73,22 @@ function Tests.start_game_uses_selected_board_size()
   assert_equal(game.state.height, 9, "Board height should update to new configured size")
 end
 
+function Tests.start_game_uses_selected_bot_difficulty()
+  local game = Game.new()
+
+  game:start_game(7, "easy")
+  assert_equal(game.bot_difficulty, "easy", "Bot difficulty should be set when starting game")
+
+  game:start_game(7, "hard")
+  assert_equal(game.bot_difficulty, "hard", "Bot difficulty should switch between easy and hard")
+end
+
 function Tests.new_starts_in_main_menu_with_default_resolution()
   local game = Game.new()
 
   assert_equal(game.screen, "main_menu", "Game should start on main menu")
   assert_equal(game.selected_resolution_id, "res_960_720", "Default resolution should be 960x720")
+  assert_equal(game.selected_bot_difficulty, "hard", "Default selected bot difficulty should be hard")
 end
 
 function Tests.apply_resolution_updates_selected_option()

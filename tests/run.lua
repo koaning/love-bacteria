@@ -2,6 +2,7 @@ local suites = {
   "tests.test_rules",
   "tests.test_game",
   "tests.test_level",
+  "tests.test_ai",
 }
 
 local function sorted_keys(tbl)
