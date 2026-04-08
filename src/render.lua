@@ -110,7 +110,7 @@ local function draw_piece(px, py, size, side)
   love.graphics.circle("fill", cx - radius * 0.22, cy - radius * 0.22, radius * 0.44)
 end
 
-local function draw_progress_bar(state, width)
+local function draw_progress_bar(state, layout)
   local player_count = board.count_cells(state, "player")
   local enemy_count = board.count_cells(state, "enemy")
   local total_cells = state.width * state.height
@@ -118,9 +118,9 @@ local function draw_progress_bar(state, width)
   local enemy_ratio = enemy_count / total_cells
   local player_percent = math.floor((player_ratio * 100) + 0.5)
   local enemy_percent = math.floor((enemy_ratio * 100) + 0.5)
-  local bar_x = 48
+  local bar_x = layout.origin_x
   local bar_y = 42
-  local bar_width = width - 96
+  local bar_width = layout.board_width
   local bar_height = 16
   local player_width = math.floor((bar_width * player_ratio) + 0.5)
   local enemy_width = math.floor((bar_width * enemy_ratio) + 0.5)
@@ -151,11 +151,6 @@ local function draw_progress_bar(state, width)
   set_color(palette.panel_edge)
   love.graphics.setLineWidth(2)
   love.graphics.rectangle("line", bar_x, bar_y, bar_width, bar_height, 8, 8)
-
-  love.graphics.setLineWidth(1)
-  love.graphics.setFont(fonts.body)
-  set_color(palette.text)
-  love.graphics.printf(("Turn: %s"):format(state.current_player == "player" and "Player" or "Enemy"), bar_x, bar_y + 24, bar_width, "center")
 end
 
 local function draw_overlay(state, width, height)
@@ -205,7 +200,7 @@ function Render.load()
 end
 
 function Render.get_layout(width, height, state)
-  local top_height = 92
+  local top_height = 76
   local bottom_margin = 20
   local max_board_width = width - 120
   local max_board_height = height - top_height - bottom_margin
@@ -237,7 +232,7 @@ function Render.draw(state)
   local move_lookup = build_move_lookup(state)
 
   draw_background(width, height)
-  draw_progress_bar(state, width)
+  draw_progress_bar(state, layout)
 
   love.graphics.setColor(
     palette.board_shadow[1],
