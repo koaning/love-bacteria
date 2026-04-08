@@ -459,22 +459,22 @@ function Game:keypressed(key)
     return
   end
 
-  if key == "up" or key == "w" then
+  if key == "up" then
     self:move_cursor(0, -1)
     return
   end
 
-  if key == "down" or key == "s" then
+  if key == "down" then
     self:move_cursor(0, 1)
     return
   end
 
-  if key == "left" or key == "a" then
+  if key == "left" then
     self:move_cursor(-1, 0)
     return
   end
 
-  if key == "right" or key == "d" then
+  if key == "right" then
     self:move_cursor(1, 0)
     return
   end

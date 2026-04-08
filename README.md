@@ -38,7 +38,7 @@ luajit tests/run.lua
 - Settings keyboard: `1`/`2`/`3` choose resolution, `Esc` goes back.
 - Left click one of your bacteria to select it.
 - Left click a highlighted cell to move.
-- In game keyboard: `Arrow keys` or `WASD` move the cursor, `Enter`/`Space` select and move.
+- In game keyboard: `Arrow keys` move the cursor, `Enter`/`Space` select and move.
 - `R` restarts the board.
 - `Esc` returns to the main menu.
 - `Esc` on the main menu quits.
