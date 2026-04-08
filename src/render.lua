@@ -154,9 +154,9 @@ local function draw_progress_bar(state, layout)
   local enemy_ratio = enemy_count / total_cells
   local player_percent = math.floor((player_ratio * 100) + 0.5)
   local enemy_percent = math.floor((enemy_ratio * 100) + 0.5)
-  local bar_x = layout.origin_x
+  local bar_x = layout.origin_x - 18
   local bar_y = 42
-  local bar_width = layout.board_width
+  local bar_width = layout.board_width + 36
   local bar_height = 16
   local player_width = math.floor((bar_width * player_ratio) + 0.5)
   local enemy_width = math.floor((bar_width * enemy_ratio) + 0.5)
