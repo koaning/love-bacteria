@@ -41,6 +41,14 @@ function Tests.easy_bot_returns_legal_move()
   assert_equal(move_exists(legal_moves, move), true, "Easy bot move should be legal")
 end
 
+function Tests.easy_bot_prefers_grow_moves()
+  local state = level.load(7)
+  state.current_player = "enemy"
+  local move = ai.choose_move(state, "enemy", "easy")
+
+  assert_equal(move.kind, "grow", "Easy bot should choose grow when grow moves are available")
+end
+
 function Tests.hard_bot_returns_legal_move()
   local state = level.load(7)
   state.current_player = "enemy"

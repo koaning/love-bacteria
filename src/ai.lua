@@ -93,6 +93,18 @@ function AI.choose_move(state, side, difficulty)
   end
 
   if bot_difficulty == "easy" then
+    local grow_moves = {}
+
+    for _, move in ipairs(legal_moves) do
+      if move.kind == "grow" then
+        grow_moves[#grow_moves + 1] = move
+      end
+    end
+
+    if #grow_moves > 0 then
+      return grow_moves[random_index(#grow_moves)]
+    end
+
     return legal_moves[random_index(#legal_moves)]
   end
 
