@@ -41,10 +41,10 @@ This creates `dist/bacteria.love` and, on macOS, a standalone app bundle at `dis
 
 ## Controls
 
-- Main menu: click `Play`, choose `5x5`, `7x7`, or `9x9`, pick bot difficulty (`Easy` or `Hard`), then click `Start`.
+- Main menu: click `Play`, choose `5x5`, `7x7`, or `9x9`, pick bot difficulty (`Easy`, `Medium`, or `Hard`), then click `Start`.
 - Menu keyboard: `Arrow keys` move focus logically, `Enter`/`Space` activates focused button.
 - Main menu keyboard: `P` opens Play, `Esc` quits.
-- Play menu keyboard: `5`/`7`/`9` choose board size, `E`/`H` choose bot difficulty, `Esc` goes back.
+- Play menu keyboard: `5`/`7`/`9` choose board size, `E`/`M`/`H` choose bot difficulty, `Esc` goes back.
 - Left click one of your bacteria to select it.
 - Left click a highlighted cell to move.
 - In game keyboard: `Arrow keys` move the cursor, `Enter`/`Space` select and move.
@@ -69,12 +69,13 @@ This creates `dist/bacteria.love` and, on macOS, a standalone app bundle at `dis
 - `main.lua` wires LÖVE callbacks into the game object.
 - `src/board.lua` contains board helpers and state cloning.
 - `src/rules.lua` contains move generation, move resolution, passing, and win detection.
-- `src/ai.lua` contains a deterministic one-ply enemy heuristic.
+- `src/ai.lua` contains enemy move selection logic for easy/medium/hard difficulties.
 - `src/render.lua` draws the board, HUD, highlights, and end-game overlay.
 - `src/input.lua` handles simple mouse and keyboard helpers.
 - `src/level.lua` defines the starting layout for the chosen board size.
 - `src/game.lua` coordinates turn flow and AI timing.
+- `assets/fonts/` contains bundled UI fonts used for title/body typography.
 
 ## Notes
 
-This workspace does not currently have `love`, `lua`, or `luarocks` installed, so the project was implemented for manual verification in a machine with LÖVE available.
+Run `love .` for a manual visual pass over transitions, animations, and typography.

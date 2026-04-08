@@ -4,6 +4,19 @@ local rules = require("src.rules")
 local Render = {}
 
 local fonts = {}
+local font_files = {
+  title = "assets/fonts/BebasNeue-Regular.ttf",
+  body = "assets/fonts/AtkinsonHyperlegible-Regular.ttf",
+}
+local font_base_sizes = {
+  title = 52,
+  section = 19,
+  button = 18,
+  body = 16,
+  hud = 14,
+  small = 13,
+}
+local current_type_scale = nil
 
 local palette = {
   background_top = { 0.07, 0.09, 0.13, 1.0 },
@@ -27,12 +40,84 @@ local palette = {
   overlay = { 0.01, 0.02, 0.03, 0.70 },
 }
 
-local function set_color(color)
-  love.graphics.setColor(color[1], color[2], color[3], color[4] or 1.0)
+local function set_color(color, alpha_multiplier)
+  local alpha = color[4] or 1.0
+  local multiplier = alpha_multiplier or 1.0
+  love.graphics.setColor(color[1], color[2], color[3], alpha * multiplier)
+end
+
+local function clamp(value, minimum, maximum)
+  if value < minimum then
+    return minimum
+  end
+
+  if value > maximum then
+    return maximum
+  end
+
+  return value
+end
+
+local function tint(color, delta)
+  return {
+    clamp(color[1] + delta, 0, 1),
+    clamp(color[2] + delta, 0, 1),
+    clamp(color[3] + delta, 0, 1),
+    color[4] or 1.0,
+  }
 end
 
 local function cell_key(x, y)
   return y .. ":" .. x
+end
+
+local function point_in_rect(x, y, rect)
+  return x >= rect.x
+    and x <= rect.x + rect.width
+    and y >= rect.y
+    and y <= rect.y + rect.height
+end
+
+local function get_hovered_button_id(buttons)
+  if not love or not love.mouse or not love.mouse.getPosition then
+    return nil
+  end
+
+  local x, y = love.mouse.getPosition()
+
+  for _, button in ipairs(buttons) do
+    if point_in_rect(x, y, button) then
+      return button.id
+    end
+  end
+
+  return nil
+end
+
+local function load_font(path, size)
+  if love and love.filesystem and love.filesystem.getInfo(path) then
+    return love.graphics.newFont(path, size)
+  end
+
+  return love.graphics.newFont(size)
+end
+
+local function refresh_fonts_for_size(width, height)
+  local min_dimension = math.min(width, height)
+  local target_scale = clamp(min_dimension / 760, 0.90, 1.20)
+
+  if current_type_scale and math.abs(target_scale - current_type_scale) < 0.03 then
+    return
+  end
+
+  current_type_scale = target_scale
+
+  fonts.title = load_font(font_files.title, math.floor((font_base_sizes.title * target_scale) + 0.5))
+  fonts.section = load_font(font_files.body, math.floor((font_base_sizes.section * target_scale) + 0.5))
+  fonts.button = load_font(font_files.body, math.floor((font_base_sizes.button * target_scale) + 0.5))
+  fonts.body = load_font(font_files.body, math.floor((font_base_sizes.body * target_scale) + 0.5))
+  fonts.hud = load_font(font_files.body, math.floor((font_base_sizes.hud * target_scale) + 0.5))
+  fonts.small = load_font(font_files.body, math.floor((font_base_sizes.small * target_scale) + 0.5))
 end
 
 local function draw_background(width, height)
@@ -48,23 +133,20 @@ local function draw_background(width, height)
     love.graphics.setColor(r, g, b, 1.0)
     love.graphics.rectangle("fill", 0, index * h, width, h + 1)
   end
-
-  love.graphics.setColor(1, 1, 1, 0.03)
-  for x = -height, width, 32 do
-    love.graphics.line(x, 0, x + height, height)
-  end
 end
 
-local function draw_panel(x, y, width, height, radius)
-  set_color(palette.panel)
+local function draw_panel(x, y, width, height, radius, alpha_multiplier)
+  set_color(palette.panel, alpha_multiplier)
   love.graphics.rectangle("fill", x, y, width, height, radius, radius)
-  set_color(palette.panel_edge)
+  set_color(palette.panel_edge, alpha_multiplier)
   love.graphics.setLineWidth(2)
   love.graphics.rectangle("line", x, y, width, height, radius, radius)
   love.graphics.setLineWidth(1)
 end
 
-local function draw_button(button, active, focused)
+local function draw_button(button, active, focused, hovered, pulse_time, y_offset, alpha_multiplier)
+  local offset_y = y_offset or 0
+  local pulse = (math.sin((pulse_time or 0) * 5.5) + 1) * 0.5
   local fill = palette.cell
   local edge = palette.cell_edge
 
@@ -73,25 +155,35 @@ local function draw_button(button, active, focused)
     edge = palette.grow_edge
   end
 
-  set_color(fill)
-  love.graphics.rectangle("fill", button.x, button.y, button.width, button.height, 12, 12)
-  set_color(edge)
-  love.graphics.setLineWidth(2)
-  love.graphics.rectangle("line", button.x, button.y, button.width, button.height, 12, 12)
+  local emphasize = 0
+  if focused or hovered then
+    emphasize = 0.03 + (pulse * 0.06)
+  end
+
+  local scale = 1 + (emphasize * 0.28)
+  local draw_width = button.width * scale
+  local draw_height = button.height * scale
+  local draw_x = button.x + ((button.width - draw_width) * 0.5)
+  local draw_y = button.y + offset_y + ((button.height - draw_height) * 0.5)
+
+  set_color(tint(fill, emphasize), alpha_multiplier)
+  love.graphics.rectangle("fill", draw_x, draw_y, draw_width, draw_height, 12, 12)
+  set_color(tint(edge, emphasize * 0.5), alpha_multiplier)
+  love.graphics.setLineWidth(focused and 3 or 2)
+  love.graphics.rectangle("line", draw_x, draw_y, draw_width, draw_height, 12, 12)
   if focused then
-    set_color(palette.selected)
-    love.graphics.setLineWidth(3)
-    love.graphics.rectangle("line", button.x + 4, button.y + 4, button.width - 8, button.height - 8, 10, 10)
+    set_color(palette.selected, alpha_multiplier)
+    love.graphics.rectangle("line", draw_x + 4, draw_y + 4, draw_width - 8, draw_height - 8, 10, 10)
   end
   love.graphics.setLineWidth(1)
 
-  love.graphics.setFont(fonts.body)
-  set_color(palette.text)
+  love.graphics.setFont(fonts.button)
+  set_color(palette.text, alpha_multiplier)
   love.graphics.printf(
     button.label,
-    button.x,
-    button.y + math.floor((button.height - 16) * 0.5),
-    button.width,
+    draw_x,
+    draw_y + math.floor((draw_height - fonts.button:getHeight()) * 0.5),
+    draw_width,
     "center"
   )
 end
@@ -128,7 +220,7 @@ local function cell_rect(layout, x, y)
   return px, py, layout.cell_size, layout.cell_size
 end
 
-local function draw_piece(px, py, size, side)
+local function draw_piece(px, py, size, side, animation, alpha_multiplier)
   local base = palette.player
   local core = palette.player_core
 
@@ -137,21 +229,44 @@ local function draw_piece(px, py, size, side)
     core = palette.enemy_core
   end
 
+  local scale = 1.0
+  local alpha = 1.0
+  local animation_progress = 1.0
+
+  if animation then
+    animation_progress = clamp(animation.progress or 0, 0, 1)
+
+    if animation.kind == "spawn" then
+      scale = 0.84 + (animation_progress * 0.16)
+      alpha = 0.45 + (animation_progress * 0.55)
+    elseif animation.kind == "convert" then
+      local pulse = math.sin(animation_progress * math.pi)
+      scale = 1.0 + (pulse * 0.10)
+    end
+  end
+
+  alpha = alpha * (alpha_multiplier or 1.0)
+
   local cx = px + size * 0.5
   local cy = py + size * 0.5
-  local radius = size * 0.32
+  local radius = size * 0.32 * scale
 
-  love.graphics.setColor(0, 0, 0, 0.18)
+  if animation and animation.kind == "convert" and animation_progress < 1 then
+    love.graphics.setColor(base[1], base[2], base[3], ((1 - animation_progress) * 0.22) * alpha)
+    love.graphics.circle("fill", cx, cy, (size * 0.34) + (size * 0.20 * animation_progress))
+  end
+
+  love.graphics.setColor(0, 0, 0, 0.18 * alpha)
   love.graphics.circle("fill", cx + 2, cy + 4, radius)
 
-  set_color(base)
+  set_color(base, alpha)
   love.graphics.circle("fill", cx, cy, radius)
 
-  set_color(core)
+  set_color(core, alpha)
   love.graphics.circle("fill", cx - radius * 0.22, cy - radius * 0.22, radius * 0.44)
 end
 
-local function draw_progress_bar(state, layout)
+local function draw_progress_bar(state, layout, alpha_multiplier)
   local player_count = board.count_cells(state, "player")
   local enemy_count = board.count_cells(state, "enemy")
   local total_cells = state.width * state.height
@@ -176,20 +291,20 @@ local function draw_progress_bar(state, layout)
     end
   end
 
-  love.graphics.setFont(fonts.small)
-  set_color(palette.player)
+  love.graphics.setFont(fonts.hud)
+  set_color(palette.player, alpha_multiplier)
   love.graphics.print(("%d%%"):format(player_percent), bar_x, bar_y - 20)
-  set_color(palette.enemy)
+  set_color(palette.enemy, alpha_multiplier)
   love.graphics.printf(("%d%%"):format(enemy_percent), bar_x, bar_y - 20, bar_width, "right")
 
-  set_color(palette.cell)
+  set_color(palette.cell, alpha_multiplier)
   love.graphics.rectangle("fill", bar_x, bar_y, bar_width, bar_height, 8, 8)
-  set_color(palette.player)
+  set_color(palette.player, alpha_multiplier)
   love.graphics.rectangle("fill", bar_x, bar_y, player_width, bar_height, 8, 8)
-  set_color(palette.enemy)
+  set_color(palette.enemy, alpha_multiplier)
   love.graphics.rectangle("fill", bar_x + bar_width - enemy_width, bar_y, enemy_width, bar_height, 8, 8)
 
-  set_color(palette.panel_edge)
+  set_color(palette.panel_edge, alpha_multiplier)
   love.graphics.setLineWidth(2)
   love.graphics.rectangle("line", bar_x, bar_y, bar_width, bar_height, 8, 8)
 end
@@ -236,7 +351,8 @@ function Render.get_play_menu_ui(width, height)
   local option_width = 120
   local option_height = 54
   local gap = 20
-  local options_x = panel_x + math.floor((panel_width - ((option_width * 3) + (gap * 2))) * 0.5)
+  local row_width = (option_width * 3) + (gap * 2)
+  local options_x = panel_x + math.floor((panel_width - row_width) * 0.5)
   local options_y = panel_y + 116
 
   return {
@@ -274,17 +390,25 @@ function Render.get_play_menu_ui(width, height)
       {
         id = "difficulty_easy",
         label = "Easy",
-        x = panel_x + 110,
+        x = options_x,
         y = panel_y + 246,
-        width = 140,
+        width = option_width,
+        height = 50,
+      },
+      {
+        id = "difficulty_medium",
+        label = "Medium",
+        x = options_x + option_width + gap,
+        y = panel_y + 246,
+        width = option_width,
         height = 50,
       },
       {
         id = "difficulty_hard",
         label = "Hard",
-        x = panel_x + panel_width - 250,
+        x = options_x + ((option_width + gap) * 2),
         y = panel_y + 246,
-        width = 140,
+        width = option_width,
         height = 50,
       },
       {
@@ -339,7 +463,7 @@ local function draw_overlay(state, width, height)
   set_color(palette.text)
   love.graphics.printf(title, panel_x, panel_y + 32, panel_width, "center")
 
-  love.graphics.setFont(fonts.body)
+  love.graphics.setFont(fonts.section)
   set_color(palette.text_muted)
   love.graphics.printf(("Player %d  |  Enemy %d"):format(
     board.count_cells(state, "player"),
@@ -347,37 +471,58 @@ local function draw_overlay(state, width, height)
   ), panel_x, panel_y + 96, panel_width, "center")
 end
 
-function Render.draw_main_menu(focused_button_id)
+function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_main_menu_ui(width, height)
+  local transition = clamp(menu_transition or 1, 0, 1)
+  local y_offset = 0
+  local hovered_id = get_hovered_button_id(ui.buttons)
 
+  refresh_fonts_for_size(width, height)
   draw_background(width, height)
-  draw_panel(ui.panel.x, ui.panel.y, ui.panel.width, ui.panel.height, 20)
+  draw_panel(ui.panel.x, ui.panel.y + y_offset, ui.panel.width, ui.panel.height, 20, transition)
 
   love.graphics.setFont(fonts.title)
-  set_color(palette.text)
-  love.graphics.printf("Bacteria", ui.panel.x, ui.panel.y + 42, ui.panel.width, "center")
+  set_color(palette.text, transition)
+  love.graphics.printf("Bacteria", ui.panel.x, ui.panel.y + 34, ui.panel.width, "center")
 
   for _, button in ipairs(ui.buttons) do
-    draw_button(button, false, button.id == focused_button_id)
+    draw_button(
+      button,
+      false,
+      button.id == focused_button_id,
+      button.id == hovered_id,
+      pulse_time,
+      y_offset,
+      transition
+    )
+  end
+
+  if transition < 1 then
+    love.graphics.setColor(0.01, 0.02, 0.03, (1 - transition) * 0.35)
+    love.graphics.rectangle("fill", 0, 0, width, height)
   end
 end
 
-function Render.draw_play_menu(selected_size, selected_difficulty, focused_button_id)
+function Render.draw_play_menu(selected_size, selected_difficulty, focused_button_id, menu_transition, pulse_time)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_play_menu_ui(width, height)
+  local transition = clamp(menu_transition or 1, 0, 1)
+  local y_offset = 0
+  local hovered_id = get_hovered_button_id(ui.buttons)
 
+  refresh_fonts_for_size(width, height)
   draw_background(width, height)
-  draw_panel(ui.panel.x, ui.panel.y, ui.panel.width, ui.panel.height, 20)
+  draw_panel(ui.panel.x, ui.panel.y + y_offset, ui.panel.width, ui.panel.height, 20, transition)
 
   love.graphics.setFont(fonts.title)
-  set_color(palette.text)
-  love.graphics.printf("Play", ui.panel.x, ui.panel.y + 32, ui.panel.width, "center")
+  set_color(palette.text, transition)
+  love.graphics.printf("Play", ui.panel.x, ui.panel.y + 30, ui.panel.width, "center")
 
-  love.graphics.setFont(fonts.body)
-  set_color(palette.text_muted)
-  love.graphics.printf("Board Size", ui.panel.x, ui.panel.y + 78, ui.panel.width, "center")
-  love.graphics.printf("Bot Difficulty", ui.panel.x, ui.panel.y + 208, ui.panel.width, "center")
+  love.graphics.setFont(fonts.section)
+  set_color(palette.text_muted, transition)
+  love.graphics.printf("Board Size", ui.panel.x, ui.panel.y + 88, ui.panel.width, "center")
+  love.graphics.printf("Bot Difficulty", ui.panel.x, ui.panel.y + 218, ui.panel.width, "center")
 
   for _, button in ipairs(ui.buttons) do
     local active = false
@@ -390,18 +535,32 @@ function Render.draw_play_menu(selected_size, selected_difficulty, focused_butto
       active = selected_size == 9
     elseif button.id == "difficulty_easy" then
       active = selected_difficulty == "easy"
+    elseif button.id == "difficulty_medium" then
+      active = selected_difficulty == "medium"
     elseif button.id == "difficulty_hard" then
       active = selected_difficulty == "hard"
     end
 
-    draw_button(button, active, button.id == focused_button_id)
+    draw_button(
+      button,
+      active,
+      button.id == focused_button_id,
+      button.id == hovered_id,
+      pulse_time,
+      y_offset,
+      transition
+    )
+  end
+
+  if transition < 1 then
+    love.graphics.setColor(0.01, 0.02, 0.03, (1 - transition) * 0.35)
+    love.graphics.rectangle("fill", 0, 0, width, height)
   end
 end
 
 function Render.load()
-  fonts.title = love.graphics.newFont(28)
-  fonts.body = love.graphics.newFont(16)
-  fonts.small = love.graphics.newFont(13)
+  local width, height = love.graphics.getDimensions()
+  refresh_fonts_for_size(width, height)
 end
 
 function Render.get_layout(width, height, state)
@@ -436,19 +595,37 @@ function Render.draw(state, view)
   local layout = Render.get_layout(width, height, state)
   local move_lookup = build_move_lookup(state)
   local cursor_cell = nil
+  local piece_animations = nil
+  local transition = 1
+  local ui_time = 0
 
   if view and view.cursor_cell then
     cursor_cell = view.cursor_cell
   end
 
+  if view and view.piece_animations then
+    piece_animations = view.piece_animations
+  end
+
+  if view and view.transition ~= nil then
+    transition = clamp(view.transition, 0, 1)
+  end
+
+  if view and view.ui_time ~= nil then
+    ui_time = view.ui_time
+  end
+
+  local highlight_pulse = (math.sin(ui_time * 5.4) + 1) * 0.5
+
+  refresh_fonts_for_size(width, height)
   draw_background(width, height)
-  draw_progress_bar(state, layout)
+  draw_progress_bar(state, layout, transition)
 
   love.graphics.setColor(
     palette.board_shadow[1],
     palette.board_shadow[2],
     palette.board_shadow[3],
-    palette.board_shadow[4]
+    palette.board_shadow[4] * transition
   )
   love.graphics.rectangle(
     "fill",
@@ -460,7 +637,7 @@ function Render.draw(state, view)
     24
   )
 
-  set_color(palette.panel)
+  set_color(palette.panel, transition)
   love.graphics.rectangle(
     "fill",
     layout.origin_x - 18,
@@ -470,7 +647,7 @@ function Render.draw(state, view)
     28,
     28
   )
-  set_color(palette.panel_edge)
+  set_color(palette.panel_edge, transition)
   love.graphics.setLineWidth(2)
   love.graphics.rectangle(
     "line",
@@ -490,43 +667,55 @@ function Render.draw(state, view)
       local is_selected = state.selected_cell and board.same_cell(state.selected_cell, { x = x, y = y })
       local is_last_move = state.last_move and board.same_cell(state.last_move.to, { x = x, y = y })
       local is_cursor = cursor_cell and cursor_cell.x == x and cursor_cell.y == y
+      local piece_animation = nil
 
-      set_color(palette.cell)
+      if piece_animations then
+        piece_animation = piece_animations[cell_key(x, y)]
+      end
+
+      set_color(palette.cell, transition)
       love.graphics.rectangle("fill", px + 3, py + 3, size - 6, size - 6, 16, 16)
-      set_color(palette.cell_edge)
+      set_color(palette.cell_edge, transition)
       love.graphics.setLineWidth(1)
       love.graphics.rectangle("line", px + 3, py + 3, size - 6, size - 6, 16, 16)
 
       if move_kind == "grow" then
-        set_color(palette.grow)
+        local move_alpha = 0.72 + (highlight_pulse * 0.28)
+        set_color(palette.grow, transition * move_alpha)
         love.graphics.rectangle("fill", px + 8, py + 8, size - 16, size - 16, 14, 14)
-        set_color(palette.grow_edge)
+        set_color(palette.grow_edge, transition * (0.80 + (highlight_pulse * 0.20)))
         love.graphics.rectangle("line", px + 8, py + 8, size - 16, size - 16, 14, 14)
       elseif move_kind == "jump" then
-        set_color(palette.jump)
+        local move_alpha = 0.72 + (highlight_pulse * 0.28)
+        set_color(palette.jump, transition * move_alpha)
         love.graphics.rectangle("fill", px + 8, py + 8, size - 16, size - 16, 14, 14)
-        set_color(palette.jump_edge)
+        set_color(palette.jump_edge, transition * (0.80 + (highlight_pulse * 0.20)))
         love.graphics.rectangle("line", px + 8, py + 8, size - 16, size - 16, 14, 14)
       end
 
       if is_selected then
-        set_color(palette.selected)
-        love.graphics.setLineWidth(3)
+        set_color(palette.selected, transition * (0.84 + (highlight_pulse * 0.16)))
+        love.graphics.setLineWidth(2 + (highlight_pulse * 2))
         love.graphics.rectangle("line", px + 5, py + 5, size - 10, size - 10, 16, 16)
       elseif is_cursor and not state.winner then
-        set_color(palette.text_muted)
-        love.graphics.setLineWidth(2)
+        set_color(palette.text_muted, transition * (0.75 + (highlight_pulse * 0.25)))
+        love.graphics.setLineWidth(1.5 + (highlight_pulse * 1.2))
         love.graphics.rectangle("line", px + 10, py + 10, size - 20, size - 20, 14, 14)
       elseif is_last_move then
-        set_color(palette.text_muted)
-        love.graphics.setLineWidth(2)
+        set_color(palette.text_muted, transition * (0.68 + (highlight_pulse * 0.20)))
+        love.graphics.setLineWidth(1.6 + (highlight_pulse * 1.0))
         love.graphics.rectangle("line", px + 7, py + 7, size - 14, size - 14, 16, 16)
       end
 
       if occupant ~= "empty" then
-        draw_piece(px, py, size, occupant)
+        draw_piece(px, py, size, occupant, piece_animation, transition)
       end
     end
+  end
+
+  if transition < 1 and not state.winner then
+    love.graphics.setColor(0.01, 0.02, 0.03, (1 - transition) * 0.42)
+    love.graphics.rectangle("fill", 0, 0, width, height)
   end
 
   if state.winner then

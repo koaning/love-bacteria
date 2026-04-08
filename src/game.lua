@@ -8,6 +8,11 @@ local rules = require("src.rules")
 local Game = {}
 Game.__index = Game
 
+local MENU_FADE_DURATION = 0.28
+local PLAY_FADE_DURATION = 0.24
+local PIECE_SPAWN_DURATION = 0.18
+local PIECE_CONVERT_DURATION = 0.24
+
 local MAIN_MENU_FOCUS = {
   play = { up = "quit", down = "quit", left = "quit", right = "quit" },
   quit = { up = "play", down = "play", left = "play", right = "play" },
@@ -15,10 +20,11 @@ local MAIN_MENU_FOCUS = {
 
 local PLAY_MENU_FOCUS = {
   size_5 = { up = "back", down = "difficulty_easy", left = "size_9", right = "size_7" },
-  size_7 = { up = "start", down = "difficulty_easy", left = "size_5", right = "size_9" },
+  size_7 = { up = "start", down = "difficulty_medium", left = "size_5", right = "size_9" },
   size_9 = { up = "start", down = "difficulty_hard", left = "size_7", right = "size_5" },
-  difficulty_easy = { up = "size_5", down = "back", left = "difficulty_hard", right = "difficulty_hard" },
-  difficulty_hard = { up = "size_9", down = "start", left = "difficulty_easy", right = "difficulty_easy" },
+  difficulty_easy = { up = "size_5", down = "back", left = "difficulty_hard", right = "difficulty_medium" },
+  difficulty_medium = { up = "size_7", down = "start", left = "difficulty_easy", right = "difficulty_hard" },
+  difficulty_hard = { up = "size_9", down = "start", left = "difficulty_medium", right = "difficulty_easy" },
   back = { up = "difficulty_easy", down = "size_5", left = "start", right = "start" },
   start = { up = "difficulty_hard", down = "size_7", left = "back", right = "back" },
 }
@@ -56,6 +62,47 @@ local function find_first_player_cell(state)
   return { x = 1, y = 1 }
 end
 
+local function animation_key(x, y)
+  return y .. ":" .. x
+end
+
+local function build_piece_animations(previous_state, next_state)
+  local animations = {}
+
+  if not next_state then
+    return animations
+  end
+
+  for y = 1, next_state.height do
+    for x = 1, next_state.width do
+      local before = "empty"
+      local after = board.get_cell(next_state, x, y)
+
+      if previous_state then
+        before = board.get_cell(previous_state, x, y) or "empty"
+      end
+
+      if after ~= "empty" and before ~= after then
+        local kind = "convert"
+        local duration = PIECE_CONVERT_DURATION
+
+        if before == "empty" then
+          kind = "spawn"
+          duration = PIECE_SPAWN_DURATION
+        end
+
+        animations[animation_key(x, y)] = {
+          kind = kind,
+          progress = 0,
+          duration = duration,
+        }
+      end
+    end
+  end
+
+  return animations
+end
+
 function Game.new()
   local self = setmetatable({}, Game)
 
@@ -67,11 +114,21 @@ function Game.new()
   self.selected_bot_difficulty = "hard"
   self.bot_difficulty = "hard"
   self.cursor_cell = nil
+  self.menu_transition = 1
+  self.menu_pulse_time = 0
+  self.play_transition = 1
+  self.visual_time = 0
+  self.piece_animations = {}
   self.menu_focus_index = nil
   self.screen = nil
   self:set_screen("main_menu")
 
   return self
+end
+
+function Game:set_state(next_state, previous_state)
+  self.state = next_state
+  self.piece_animations = build_piece_animations(previous_state, next_state)
 end
 
 function Game:start_game(board_size, bot_difficulty)
@@ -81,7 +138,8 @@ function Game:start_game(board_size, bot_difficulty)
   self.selected_bot_difficulty = difficulty
   self.board_size = size
   self.bot_difficulty = difficulty
-  self.state = rules.resolve_state(level.load(size))
+  local next_state = rules.resolve_state(level.load(size))
+  self:set_state(next_state, nil)
   self:set_screen("playing")
   self.ai_timer = 0
   self.cursor_cell = find_first_player_cell(self.state)
@@ -92,14 +150,38 @@ function Game:restart()
     return
   end
 
-  self.state = rules.resolve_state(level.load(self.board_size))
+  local next_state = rules.resolve_state(level.load(self.board_size))
+  self:set_state(next_state, nil)
   self.ai_timer = 0
   self.cursor_cell = find_first_player_cell(self.state)
 end
 
 function Game:commit_move(move)
-  self.state = rules.resolve_state(rules.apply_move(self.state, move))
+  local next_state = rules.resolve_state(rules.apply_move(self.state, move))
+  self:set_state(next_state, self.state)
   self.ai_timer = 0
+end
+
+function Game:update_piece_animations(dt)
+  if not self.piece_animations then
+    return
+  end
+
+  local delta = dt or 0
+
+  if delta <= 0 then
+    return
+  end
+
+  for key, animation in pairs(self.piece_animations) do
+    local duration = animation.duration or PIECE_SPAWN_DURATION
+    local progress = animation.progress + (delta / duration)
+    animation.progress = progress
+
+    if progress >= 1 then
+      self.piece_animations[key] = nil
+    end
+  end
 end
 
 function Game:get_window_dimensions()
@@ -155,9 +237,14 @@ function Game:set_screen(screen)
 
   if screen == "playing" then
     self.menu_focus_index = nil
+    self.menu_transition = 1
+    self.play_transition = 0
     return
   end
 
+  self.play_transition = 1
+  self.menu_transition = 0
+  self.menu_pulse_time = 0
   self.menu_focus_index = self:default_menu_focus_index(screen)
 end
 
@@ -294,6 +381,12 @@ function Game:handle_play_menu_action(button_id)
     return
   end
 
+  if button_id == "difficulty_medium" then
+    self.selected_bot_difficulty = "medium"
+    self:set_menu_focus_by_id(button_id)
+    return
+  end
+
   if button_id == "difficulty_hard" then
     self.selected_bot_difficulty = "hard"
     self:set_menu_focus_by_id(button_id)
@@ -422,10 +515,26 @@ function Game:resolve_forced_pass()
 end
 
 function Game:update(dt)
+  local delta = dt or 0
+  self.visual_time = self.visual_time + delta
+
+  if self.screen == "main_menu" or self.screen == "play_menu" then
+    self.menu_pulse_time = self.menu_pulse_time + delta
+    if self.menu_transition < 1 then
+      self.menu_transition = math.min(1, self.menu_transition + (delta / MENU_FADE_DURATION))
+    end
+    return
+  end
+
   if self.screen ~= "playing" or not self.state then
     return
   end
 
+  if self.play_transition < 1 then
+    self.play_transition = math.min(1, self.play_transition + (delta / PLAY_FADE_DURATION))
+  end
+
+  self:update_piece_animations(delta)
   self:resolve_forced_pass()
 
   if self.state.winner then
@@ -433,7 +542,7 @@ function Game:update(dt)
   end
 
   if self.state.current_player == "enemy" then
-    self.ai_timer = self.ai_timer + dt
+    self.ai_timer = self.ai_timer + delta
 
     if self.ai_timer >= self.ai_delay then
       self:run_enemy_turn()
@@ -576,6 +685,11 @@ function Game:keypressed(key)
       return
     end
 
+    if key == "m" then
+      self.selected_bot_difficulty = "medium"
+      return
+    end
+
     if key == "h" then
       self.selected_bot_difficulty = "hard"
       return
@@ -625,6 +739,7 @@ function Game:keypressed(key)
   if input.is_quit_key(key) then
     self:set_screen("main_menu")
     self.state = nil
+    self.piece_animations = {}
     self.ai_timer = 0
     self.cursor_cell = nil
   end
@@ -632,7 +747,11 @@ end
 
 function Game:draw()
   if self.screen == "main_menu" then
-    render.draw_main_menu(self:get_focused_menu_button_id())
+    render.draw_main_menu(
+      self:get_focused_menu_button_id(),
+      self.menu_transition,
+      self.menu_pulse_time
+    )
     return
   end
 
@@ -640,7 +759,9 @@ function Game:draw()
     render.draw_play_menu(
       self.selected_board_size,
       self.selected_bot_difficulty,
-      self:get_focused_menu_button_id()
+      self:get_focused_menu_button_id(),
+      self.menu_transition,
+      self.menu_pulse_time
     )
     return
   end
@@ -648,6 +769,9 @@ function Game:draw()
   if self.state then
     render.draw(self.state, {
       cursor_cell = self.cursor_cell,
+      piece_animations = self.piece_animations,
+      transition = self.play_transition,
+      ui_time = self.visual_time,
     })
   end
 end

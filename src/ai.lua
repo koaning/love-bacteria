@@ -84,6 +84,22 @@ local function random_index(maximum)
   return math.random(maximum)
 end
 
+local function choose_best_move(state, side, legal_moves)
+  local best_move = nil
+  local best_score = nil
+
+  for _, move in ipairs(legal_moves) do
+    local score = score_move(state, side, move)
+
+    if compare_moves(move, score, best_move, best_score) then
+      best_move = move
+      best_score = score
+    end
+  end
+
+  return best_move
+end
+
 function AI.choose_move(state, side, difficulty)
   local legal_moves = rules.get_legal_moves(state, side)
   local bot_difficulty = difficulty or "hard"
@@ -108,16 +124,14 @@ function AI.choose_move(state, side, difficulty)
     return legal_moves[random_index(#legal_moves)]
   end
 
-  local best_move = nil
-  local best_score = nil
+  local best_move = choose_best_move(state, side, legal_moves)
 
-  for _, move in ipairs(legal_moves) do
-    local score = score_move(state, side, move)
-
-    if compare_moves(move, score, best_move, best_score) then
-      best_move = move
-      best_score = score
+  if bot_difficulty == "medium" then
+    if random_index(3) == 1 then
+      return legal_moves[random_index(#legal_moves)]
     end
+
+    return best_move
   end
 
   return best_move

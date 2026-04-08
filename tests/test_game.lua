@@ -24,6 +24,14 @@ local function fill_board(state, side)
   end
 end
 
+local function count_pairs(tbl)
+  local count = 0
+  for _ in pairs(tbl) do
+    count = count + 1
+  end
+  return count
+end
+
 local function blocked_player_state()
   local state = board.new_state(7, 7)
   fill_board(state, "enemy")
@@ -79,6 +87,9 @@ function Tests.start_game_uses_selected_bot_difficulty()
   game:start_game(7, "easy")
   assert_equal(game.bot_difficulty, "easy", "Bot difficulty should be set when starting game")
 
+  game:start_game(7, "medium")
+  assert_equal(game.bot_difficulty, "medium", "Bot difficulty should support medium")
+
   game:start_game(7, "hard")
   assert_equal(game.bot_difficulty, "hard", "Bot difficulty should switch between easy and hard")
 end
@@ -88,6 +99,27 @@ function Tests.new_starts_in_main_menu_with_default_difficulty()
 
   assert_equal(game.screen, "main_menu", "Game should start on main menu")
   assert_equal(game.selected_bot_difficulty, "hard", "Default selected bot difficulty should be hard")
+end
+
+function Tests.menu_transition_advances_over_time()
+  local game = Game.new()
+
+  assert_equal(game.menu_transition, 0, "Menu transition should reset when entering a menu")
+  game:update(0.12)
+  assert_truthy(game.menu_transition > 0 and game.menu_transition < 1, "Menu transition should animate in")
+  game:update(1.0)
+  assert_equal(game.menu_transition, 1, "Menu transition should cap at full visibility")
+end
+
+function Tests.play_transition_advances_during_gameplay()
+  local game = Game.new()
+  game:start_game(7, "hard")
+
+  assert_equal(game.play_transition, 0, "Gameplay transition should reset when entering a match")
+  game:update(0.10)
+  assert_truthy(game.play_transition > 0 and game.play_transition < 1, "Gameplay transition should animate in")
+  game:update(1.0)
+  assert_equal(game.play_transition, 1, "Gameplay transition should cap at full visibility")
 end
 
 function Tests.main_menu_keyboard_shortcuts()
@@ -108,6 +140,17 @@ function Tests.play_menu_keyboard_shortcuts()
   assert_equal(game.screen, "playing", "Enter should start game from play menu")
   assert_equal(game.state.width, 5, "Board size hotkey should be applied")
   assert_equal(game.bot_difficulty, "easy", "Difficulty hotkey should be applied")
+end
+
+function Tests.play_menu_keyboard_medium_shortcut()
+  local game = Game.new()
+  game:set_screen("play_menu")
+
+  game:keypressed("m")
+  game:keypressed("return")
+
+  assert_equal(game.screen, "playing", "Enter should start game from play menu")
+  assert_equal(game.bot_difficulty, "medium", "M hotkey should select medium difficulty")
 end
 
 function Tests.main_menu_arrow_focus_selects_play()
@@ -142,6 +185,19 @@ function Tests.play_menu_vertical_focus_activates_difficulty()
   assert_equal(game.screen, "play_menu", "Selecting difficulty should keep play menu open")
 end
 
+function Tests.play_menu_arrow_focus_can_activate_medium_difficulty()
+  local game = Game.new()
+  game:set_screen("play_menu")
+  game.selected_bot_difficulty = "hard"
+
+  game:keypressed("up")
+  game:keypressed("left")
+  game:keypressed("return")
+
+  assert_equal(game.selected_bot_difficulty, "medium", "Arrow focus plus Enter should activate medium difficulty")
+  assert_equal(game.screen, "play_menu", "Selecting difficulty should keep play menu open")
+end
+
 function Tests.playing_keyboard_cursor_can_select_and_move()
   local game = Game.new()
   game:start_game(7, "hard")
@@ -160,6 +216,15 @@ function Tests.playing_keyboard_cursor_can_select_and_move()
   game:keypressed("space")
   assert_equal(board.get_cell(game.state, 2, 1), "player", "Space should execute legal move from selected piece")
   assert_equal(game.state.current_player, "enemy", "After player move it should become enemy turn")
+end
+
+function Tests.start_game_adds_piece_spawn_animations()
+  local game = Game.new()
+  game:start_game(7, "hard")
+
+  assert_equal(count_pairs(game.piece_animations), 4, "Starting layout should animate four starting pieces")
+  game:update_piece_animations(1.0)
+  assert_equal(next(game.piece_animations), nil, "Piece animations should expire after enough time")
 end
 
 return Tests
