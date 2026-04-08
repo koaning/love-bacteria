@@ -8,11 +8,28 @@ local rules = require("src.rules")
 local Game = {}
 Game.__index = Game
 
+local RESOLUTION_OPTIONS = {
+  { id = "res_800_600", width = 800, height = 600 },
+  { id = "res_960_720", width = 960, height = 720 },
+  { id = "res_1280_900", width = 1280, height = 900 },
+}
+local DEFAULT_RESOLUTION_ID = "res_960_720"
+
 local function point_in_rect(x, y, rect)
   return x >= rect.x
     and x <= rect.x + rect.width
     and y >= rect.y
     and y <= rect.y + rect.height
+end
+
+local function find_resolution_option(id)
+  for _, option in ipairs(RESOLUTION_OPTIONS) do
+    if option.id == id then
+      return option
+    end
+  end
+
+  return nil
 end
 
 function Game.new()
@@ -24,6 +41,7 @@ function Game.new()
   self.screen = "main_menu"
   self.selected_board_size = 7
   self.board_size = 7
+  self.selected_resolution_id = DEFAULT_RESOLUTION_ID
 
   return self
 end
@@ -35,6 +53,29 @@ function Game:start_game(board_size)
   self.state = rules.resolve_state(level.load(size))
   self.screen = "playing"
   self.ai_timer = 0
+end
+
+function Game:apply_resolution(option_id)
+  local option = find_resolution_option(option_id)
+
+  if not option then
+    return false
+  end
+
+  if love and love.window and love.window.setMode then
+    local ok = love.window.setMode(option.width, option.height, {
+      resizable = false,
+      vsync = 1,
+      msaa = 4,
+    })
+
+    if not ok then
+      return false
+    end
+  end
+
+  self.selected_resolution_id = option.id
+  return true
 end
 
 function Game:restart()
@@ -71,6 +112,11 @@ function Game:handle_main_menu_click(x, y)
     return
   end
 
+  if button_id == "settings" then
+    self.screen = "settings_menu"
+    return
+  end
+
   if button_id == "quit" then
     love.event.quit()
   end
@@ -104,6 +150,23 @@ function Game:handle_play_menu_click(x, y)
   if button_id == "start" then
     self:start_game(self.selected_board_size)
   end
+end
+
+function Game:handle_settings_menu_click(x, y)
+  local width, height = love.graphics.getDimensions()
+  local ui = render.get_settings_menu_ui(width, height)
+  local button_id = self:find_clicked_button(ui.buttons, x, y)
+
+  if not button_id then
+    return
+  end
+
+  if button_id == "back" then
+    self.screen = "main_menu"
+    return
+  end
+
+  self:apply_resolution(button_id)
 end
 
 function Game:run_enemy_turn()
@@ -183,6 +246,11 @@ function Game:mousepressed(x, y, button)
     return
   end
 
+  if self.screen == "settings_menu" then
+    self:handle_settings_menu_click(x, y)
+    return
+  end
+
   if self.screen ~= "playing" or not self.state then
     return
   end
@@ -235,6 +303,13 @@ function Game:keypressed(key)
     return
   end
 
+  if self.screen == "settings_menu" then
+    if input.is_quit_key(key) then
+      self.screen = "main_menu"
+    end
+    return
+  end
+
   if input.is_restart_key(key) then
     self:restart()
     return
@@ -255,6 +330,11 @@ function Game:draw()
 
   if self.screen == "play_menu" then
     render.draw_play_menu(self.selected_board_size)
+    return
+  end
+
+  if self.screen == "settings_menu" then
+    render.draw_settings_menu(self.selected_resolution_id)
     return
   end
 

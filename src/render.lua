@@ -191,7 +191,7 @@ end
 
 function Render.get_main_menu_ui(width, height)
   local panel_width = 420
-  local panel_height = 270
+  local panel_height = 336
   local panel_x = math.floor((width - panel_width) * 0.5)
   local panel_y = math.floor((height - panel_height) * 0.5)
 
@@ -207,7 +207,15 @@ function Render.get_main_menu_ui(width, height)
         id = "play",
         label = "Play",
         x = panel_x + 70,
-        y = panel_y + 118,
+        y = panel_y + 110,
+        width = panel_width - 140,
+        height = 50,
+      },
+      {
+        id = "settings",
+        label = "Settings",
+        x = panel_x + 70,
+        y = panel_y + 174,
         width = panel_width - 140,
         height = 50,
       },
@@ -215,7 +223,7 @@ function Render.get_main_menu_ui(width, height)
         id = "quit",
         label = "Quit",
         x = panel_x + 70,
-        y = panel_y + 182,
+        y = panel_y + 238,
         width = panel_width - 140,
         height = 50,
       },
@@ -278,6 +286,61 @@ function Render.get_play_menu_ui(width, height)
         id = "start",
         label = "Start",
         x = panel_x + panel_width - 236,
+        y = panel_y + 242,
+        width = 180,
+        height = 50,
+      },
+    },
+  }
+end
+
+function Render.get_settings_menu_ui(width, height)
+  local panel_width = 520
+  local panel_height = 330
+  local panel_x = math.floor((width - panel_width) * 0.5)
+  local panel_y = math.floor((height - panel_height) * 0.5)
+  local option_width = 140
+  local option_height = 54
+  local gap = 14
+  local options_x = panel_x + math.floor((panel_width - ((option_width * 3) + (gap * 2))) * 0.5)
+  local options_y = panel_y + 130
+
+  return {
+    panel = {
+      x = panel_x,
+      y = panel_y,
+      width = panel_width,
+      height = panel_height,
+    },
+    buttons = {
+      {
+        id = "res_800_600",
+        label = "800x600",
+        x = options_x,
+        y = options_y,
+        width = option_width,
+        height = option_height,
+      },
+      {
+        id = "res_960_720",
+        label = "960x720",
+        x = options_x + option_width + gap,
+        y = options_y,
+        width = option_width,
+        height = option_height,
+      },
+      {
+        id = "res_1280_900",
+        label = "1280x900",
+        x = options_x + ((option_width + gap) * 2),
+        y = options_y,
+        width = option_width,
+        height = option_height,
+      },
+      {
+        id = "back",
+        label = "Back",
+        x = panel_x + math.floor((panel_width - 180) * 0.5),
         y = panel_y + 242,
         width = 180,
         height = 50,
@@ -368,6 +431,27 @@ function Render.draw_play_menu(selected_size)
       active = selected_size == 9
     end
 
+    draw_button(button, active)
+  end
+end
+
+function Render.draw_settings_menu(selected_resolution_id)
+  local width, height = love.graphics.getDimensions()
+  local ui = Render.get_settings_menu_ui(width, height)
+
+  draw_background(width, height)
+  draw_panel(ui.panel.x, ui.panel.y, ui.panel.width, ui.panel.height, 20)
+
+  love.graphics.setFont(fonts.title)
+  set_color(palette.text)
+  love.graphics.printf("Settings", ui.panel.x, ui.panel.y + 32, ui.panel.width, "center")
+
+  love.graphics.setFont(fonts.body)
+  set_color(palette.text_muted)
+  love.graphics.printf("Resolution", ui.panel.x, ui.panel.y + 92, ui.panel.width, "center")
+
+  for _, button in ipairs(ui.buttons) do
+    local active = button.id == selected_resolution_id
     draw_button(button, active)
   end
 end
