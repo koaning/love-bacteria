@@ -83,22 +83,11 @@ function Tests.start_game_uses_selected_bot_difficulty()
   assert_equal(game.bot_difficulty, "hard", "Bot difficulty should switch between easy and hard")
 end
 
-function Tests.new_starts_in_main_menu_with_default_resolution()
+function Tests.new_starts_in_main_menu_with_default_difficulty()
   local game = Game.new()
 
   assert_equal(game.screen, "main_menu", "Game should start on main menu")
-  assert_equal(game.selected_resolution_id, "res_840_760", "Default resolution should be 840x760")
   assert_equal(game.selected_bot_difficulty, "hard", "Default selected bot difficulty should be hard")
-end
-
-function Tests.apply_resolution_updates_selected_option()
-  local game = Game.new()
-
-  assert_equal(game:apply_resolution("res_700_700"), true, "Known resolution should apply")
-  assert_equal(game.selected_resolution_id, "res_700_700", "Selected resolution should update")
-
-  assert_equal(game:apply_resolution("res_missing"), false, "Unknown resolution should fail")
-  assert_equal(game.selected_resolution_id, "res_700_700", "Selected resolution should not change on failure")
 end
 
 function Tests.main_menu_keyboard_shortcuts()
@@ -106,10 +95,6 @@ function Tests.main_menu_keyboard_shortcuts()
 
   game:keypressed("p")
   assert_equal(game.screen, "play_menu", "P key should open play menu")
-
-  game:set_screen("main_menu")
-  game:keypressed("s")
-  assert_equal(game.screen, "settings_menu", "S key should open settings menu")
 end
 
 function Tests.play_menu_keyboard_shortcuts()
@@ -125,23 +110,14 @@ function Tests.play_menu_keyboard_shortcuts()
   assert_equal(game.bot_difficulty, "easy", "Difficulty hotkey should be applied")
 end
 
-function Tests.settings_menu_keyboard_shortcuts()
-  local game = Game.new()
-  game:set_screen("settings_menu")
-
-  game:keypressed("1")
-  assert_equal(game.selected_resolution_id, "res_700_700", "1 should pick smallest resolution")
-  game:keypressed("3")
-  assert_equal(game.selected_resolution_id, "res_960_800", "3 should pick largest resolution")
-end
-
-function Tests.main_menu_arrow_focus_selects_settings()
+function Tests.main_menu_arrow_focus_selects_play()
   local game = Game.new()
 
   game:keypressed("down")
+  game:keypressed("up")
   game:keypressed("return")
 
-  assert_equal(game.screen, "settings_menu", "Arrow focus plus Enter should activate focused menu button")
+  assert_equal(game.screen, "play_menu", "Arrow focus plus Enter should activate focused menu button")
 end
 
 function Tests.play_menu_arrow_focus_can_activate_back()
@@ -152,6 +128,18 @@ function Tests.play_menu_arrow_focus_can_activate_back()
   game:keypressed("return")
 
   assert_equal(game.screen, "main_menu", "Arrow focus plus Enter should activate focused play menu button")
+end
+
+function Tests.play_menu_vertical_focus_activates_difficulty()
+  local game = Game.new()
+  game:set_screen("play_menu")
+  game.selected_bot_difficulty = "easy"
+
+  game:keypressed("up")
+  game:keypressed("return")
+
+  assert_equal(game.selected_bot_difficulty, "hard", "Up from start should focus hard difficulty")
+  assert_equal(game.screen, "play_menu", "Selecting difficulty should keep play menu open")
 end
 
 function Tests.playing_keyboard_cursor_can_select_and_move()
