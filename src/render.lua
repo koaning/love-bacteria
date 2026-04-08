@@ -64,7 +64,7 @@ local function draw_panel(x, y, width, height, radius)
   love.graphics.setLineWidth(1)
 end
 
-local function draw_button(button, active)
+local function draw_button(button, active, focused)
   local fill = palette.cell
   local edge = palette.cell_edge
 
@@ -78,6 +78,11 @@ local function draw_button(button, active)
   set_color(edge)
   love.graphics.setLineWidth(2)
   love.graphics.rectangle("line", button.x, button.y, button.width, button.height, 12, 12)
+  if focused then
+    set_color(palette.selected)
+    love.graphics.setLineWidth(3)
+    love.graphics.rectangle("line", button.x + 4, button.y + 4, button.width - 8, button.height - 8, 10, 10)
+  end
   love.graphics.setLineWidth(1)
 
   love.graphics.setFont(fonts.body)
@@ -405,7 +410,7 @@ local function draw_overlay(state, width, height)
   ), panel_x, panel_y + 96, panel_width, "center")
 end
 
-function Render.draw_main_menu()
+function Render.draw_main_menu(focused_button_id)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_main_menu_ui(width, height)
 
@@ -417,11 +422,11 @@ function Render.draw_main_menu()
   love.graphics.printf("Bacteria", ui.panel.x, ui.panel.y + 42, ui.panel.width, "center")
 
   for _, button in ipairs(ui.buttons) do
-    draw_button(button, false)
+    draw_button(button, false, button.id == focused_button_id)
   end
 end
 
-function Render.draw_play_menu(selected_size, selected_difficulty)
+function Render.draw_play_menu(selected_size, selected_difficulty, focused_button_id)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_play_menu_ui(width, height)
 
@@ -452,11 +457,11 @@ function Render.draw_play_menu(selected_size, selected_difficulty)
       active = selected_difficulty == "hard"
     end
 
-    draw_button(button, active)
+    draw_button(button, active, button.id == focused_button_id)
   end
 end
 
-function Render.draw_settings_menu(selected_resolution_id)
+function Render.draw_settings_menu(selected_resolution_id, focused_button_id)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_settings_menu_ui(width, height)
 
@@ -473,7 +478,7 @@ function Render.draw_settings_menu(selected_resolution_id)
 
   for _, button in ipairs(ui.buttons) do
     local active = button.id == selected_resolution_id
-    draw_button(button, active)
+    draw_button(button, active, button.id == focused_button_id)
   end
 end
 

@@ -36,6 +36,16 @@ local function find_resolution_option(id)
   return nil
 end
 
+local function find_button_index(buttons, button_id)
+  for index, button in ipairs(buttons) do
+    if button.id == button_id then
+      return index
+    end
+  end
+
+  return nil
+end
+
 local function find_first_player_cell(state)
   for y = 1, state.height do
     for x = 1, state.width do
@@ -54,13 +64,15 @@ function Game.new()
   self.ai_delay = 0.45
   self.ai_timer = 0
   self.state = nil
-  self.screen = "main_menu"
   self.selected_board_size = 7
   self.board_size = 7
   self.selected_bot_difficulty = "hard"
   self.bot_difficulty = "hard"
   self.selected_resolution_id = DEFAULT_RESOLUTION_ID
   self.cursor_cell = nil
+  self.menu_focus_index = nil
+  self.screen = nil
+  self:set_screen("main_menu")
 
   return self
 end
@@ -73,7 +85,7 @@ function Game:start_game(board_size, bot_difficulty)
   self.board_size = size
   self.bot_difficulty = difficulty
   self.state = rules.resolve_state(level.load(size))
-  self.screen = "playing"
+  self:set_screen("playing")
   self.ai_timer = 0
   self.cursor_cell = find_first_player_cell(self.state)
 end
@@ -116,91 +128,261 @@ function Game:commit_move(move)
   self.ai_timer = 0
 end
 
-function Game:find_clicked_button(buttons, x, y)
-  for _, button in ipairs(buttons) do
-    if point_in_rect(x, y, button) then
-      return button.id
-    end
+function Game:get_window_dimensions()
+  if love and love.graphics and love.graphics.getDimensions then
+    return love.graphics.getDimensions()
+  end
+
+  return 960, 720
+end
+
+function Game:get_menu_ui(screen)
+  local width, height = self:get_window_dimensions()
+  local target_screen = screen or self.screen
+
+  if target_screen == "main_menu" then
+    return render.get_main_menu_ui(width, height)
+  end
+
+  if target_screen == "play_menu" then
+    return render.get_play_menu_ui(width, height)
+  end
+
+  if target_screen == "settings_menu" then
+    return render.get_settings_menu_ui(width, height)
   end
 
   return nil
 end
 
-function Game:handle_main_menu_click(x, y)
-  local width, height = love.graphics.getDimensions()
-  local ui = render.get_main_menu_ui(width, height)
-  local button_id = self:find_clicked_button(ui.buttons, x, y)
+function Game:get_menu_buttons(screen)
+  local ui = self:get_menu_ui(screen)
 
-  if button_id == "play" then
-    self.screen = "play_menu"
+  if not ui then
+    return nil
+  end
+
+  return ui.buttons
+end
+
+function Game:default_menu_focus_index(screen)
+  local target_screen = screen or self.screen
+  local buttons = self:get_menu_buttons(target_screen)
+
+  if not buttons or #buttons == 0 then
+    return nil
+  end
+
+  if target_screen == "play_menu" then
+    return find_button_index(buttons, "start") or 1
+  end
+
+  if target_screen == "settings_menu" then
+    return find_button_index(buttons, self.selected_resolution_id) or 1
+  end
+
+  return 1
+end
+
+function Game:set_screen(screen)
+  self.screen = screen
+
+  if screen == "playing" then
+    self.menu_focus_index = nil
     return
   end
 
-  if button_id == "settings" then
-    self.screen = "settings_menu"
+  self.menu_focus_index = self:default_menu_focus_index(screen)
+end
+
+function Game:get_focused_menu_button_id()
+  local buttons = self:get_menu_buttons()
+
+  if not buttons or #buttons == 0 then
+    return nil
+  end
+
+  local focus_index = self.menu_focus_index or self:default_menu_focus_index()
+
+  if not focus_index then
+    return nil
+  end
+
+  local button = buttons[focus_index]
+  if not button then
+    return nil
+  end
+
+  return button.id
+end
+
+function Game:set_menu_focus_by_id(button_id)
+  local buttons = self:get_menu_buttons()
+
+  if not buttons then
     return
   end
 
-  if button_id == "quit" then
-    love.event.quit()
+  local index = find_button_index(buttons, button_id)
+  if index then
+    self.menu_focus_index = index
   end
 end
 
-function Game:handle_play_menu_click(x, y)
-  local width, height = love.graphics.getDimensions()
-  local ui = render.get_play_menu_ui(width, height)
-  local button_id = self:find_clicked_button(ui.buttons, x, y)
+function Game:move_menu_focus(step)
+  local buttons = self:get_menu_buttons()
 
-  if button_id == "size_5" then
-    self.selected_board_size = 5
+  if not buttons or #buttons == 0 then
     return
   end
 
-  if button_id == "size_7" then
-    self.selected_board_size = 7
-    return
+  local focus_index = self.menu_focus_index or self:default_menu_focus_index() or 1
+  local next_index = focus_index + step
+
+  if next_index < 1 then
+    next_index = #buttons
+  elseif next_index > #buttons then
+    next_index = 1
   end
 
-  if button_id == "size_9" then
-    self.selected_board_size = 9
-    return
-  end
-
-  if button_id == "difficulty_easy" then
-    self.selected_bot_difficulty = "easy"
-    return
-  end
-
-  if button_id == "difficulty_hard" then
-    self.selected_bot_difficulty = "hard"
-    return
-  end
-
-  if button_id == "back" then
-    self.screen = "main_menu"
-    return
-  end
-
-  if button_id == "start" then
-    self:start_game(self.selected_board_size, self.selected_bot_difficulty)
-  end
+  self.menu_focus_index = next_index
 end
 
-function Game:handle_settings_menu_click(x, y)
-  local width, height = love.graphics.getDimensions()
-  local ui = render.get_settings_menu_ui(width, height)
-  local button_id = self:find_clicked_button(ui.buttons, x, y)
+function Game:activate_focused_menu_button()
+  local button_id = self:get_focused_menu_button_id()
 
   if not button_id then
     return
   end
 
-  if button_id == "back" then
-    self.screen = "main_menu"
+  if self.screen == "main_menu" then
+    self:handle_main_menu_action(button_id)
     return
   end
 
-  self:apply_resolution(button_id)
+  if self.screen == "play_menu" then
+    self:handle_play_menu_action(button_id)
+    return
+  end
+
+  if self.screen == "settings_menu" then
+    self:handle_settings_menu_action(button_id)
+  end
+end
+
+function Game:find_clicked_button(buttons, x, y)
+  for index, button in ipairs(buttons) do
+    if point_in_rect(x, y, button) then
+      return button.id, index
+    end
+  end
+
+  return nil, nil
+end
+
+function Game:handle_main_menu_action(button_id)
+  if button_id == "play" then
+    self:set_screen("play_menu")
+    return
+  end
+
+  if button_id == "settings" then
+    self:set_screen("settings_menu")
+    return
+  end
+
+  if button_id == "quit" and love and love.event then
+    love.event.quit()
+  end
+end
+
+function Game:handle_main_menu_click(x, y)
+  local ui = self:get_menu_ui("main_menu")
+  local button_id, button_index = self:find_clicked_button(ui.buttons, x, y)
+
+  if not button_id then
+    return
+  end
+
+  self.menu_focus_index = button_index
+  self:handle_main_menu_action(button_id)
+end
+
+function Game:handle_play_menu_action(button_id)
+  if button_id == "size_5" then
+    self.selected_board_size = 5
+    self:set_menu_focus_by_id(button_id)
+    return
+  end
+
+  if button_id == "size_7" then
+    self.selected_board_size = 7
+    self:set_menu_focus_by_id(button_id)
+    return
+  end
+
+  if button_id == "size_9" then
+    self.selected_board_size = 9
+    self:set_menu_focus_by_id(button_id)
+    return
+  end
+
+  if button_id == "difficulty_easy" then
+    self.selected_bot_difficulty = "easy"
+    self:set_menu_focus_by_id(button_id)
+    return
+  end
+
+  if button_id == "difficulty_hard" then
+    self.selected_bot_difficulty = "hard"
+    self:set_menu_focus_by_id(button_id)
+    return
+  end
+
+  if button_id == "back" then
+    self:set_screen("main_menu")
+    return
+  end
+
+  if button_id == "start" then
+    self:start_game(self.selected_board_size, self.selected_bot_difficulty)
+    return
+  end
+end
+
+function Game:handle_play_menu_click(x, y)
+  local ui = self:get_menu_ui("play_menu")
+  local button_id, button_index = self:find_clicked_button(ui.buttons, x, y)
+
+  if not button_id then
+    return
+  end
+
+  self.menu_focus_index = button_index
+  self:handle_play_menu_action(button_id)
+end
+
+function Game:handle_settings_menu_action(button_id)
+  if button_id == "back" then
+    self:set_screen("main_menu")
+    return
+  end
+
+  if self:apply_resolution(button_id) then
+    self:set_menu_focus_by_id(button_id)
+  end
+end
+
+function Game:handle_settings_menu_click(x, y)
+  local ui = self:get_menu_ui("settings_menu")
+  local button_id, button_index = self:find_clicked_button(ui.buttons, x, y)
+
+  if not button_id then
+    return
+  end
+
+  self.menu_focus_index = button_index
+  self:handle_settings_menu_action(button_id)
 end
 
 function Game:move_cursor(dx, dy)
@@ -384,13 +566,28 @@ end
 
 function Game:keypressed(key)
   if self.screen == "main_menu" then
-    if key == "p" or is_confirm_key(key) then
-      self.screen = "play_menu"
+    if key == "up" or key == "left" then
+      self:move_menu_focus(-1)
+      return
+    end
+
+    if key == "down" or key == "right" then
+      self:move_menu_focus(1)
+      return
+    end
+
+    if key == "p" then
+      self:handle_main_menu_action("play")
       return
     end
 
     if key == "s" then
-      self.screen = "settings_menu"
+      self:handle_main_menu_action("settings")
+      return
+    end
+
+    if is_confirm_key(key) then
+      self:activate_focused_menu_button()
       return
     end
 
@@ -401,6 +598,16 @@ function Game:keypressed(key)
   end
 
   if self.screen == "play_menu" then
+    if key == "up" or key == "left" then
+      self:move_menu_focus(-1)
+      return
+    end
+
+    if key == "down" or key == "right" then
+      self:move_menu_focus(1)
+      return
+    end
+
     if key == "5" then
       self.selected_board_size = 5
       return
@@ -427,34 +634,49 @@ function Game:keypressed(key)
     end
 
     if is_confirm_key(key) then
-      self:start_game(self.selected_board_size, self.selected_bot_difficulty)
+      self:activate_focused_menu_button()
       return
     end
 
     if input.is_quit_key(key) then
-      self.screen = "main_menu"
+      self:set_screen("main_menu")
     end
     return
   end
 
   if self.screen == "settings_menu" then
+    if key == "up" or key == "left" then
+      self:move_menu_focus(-1)
+      return
+    end
+
+    if key == "down" or key == "right" then
+      self:move_menu_focus(1)
+      return
+    end
+
     if key == "1" then
-      self:apply_resolution("res_700_700")
+      self:handle_settings_menu_action("res_700_700")
       return
     end
 
     if key == "2" then
-      self:apply_resolution("res_840_760")
+      self:handle_settings_menu_action("res_840_760")
       return
     end
 
     if key == "3" then
-      self:apply_resolution("res_960_800")
+      self:handle_settings_menu_action("res_960_800")
+      return
+    end
+
+    if is_confirm_key(key) then
+      self:activate_focused_menu_button()
       return
     end
 
     if input.is_quit_key(key) then
-      self.screen = "main_menu"
+      self:set_screen("main_menu")
     end
     return
   end
@@ -490,7 +712,7 @@ function Game:keypressed(key)
   end
 
   if input.is_quit_key(key) then
-    self.screen = "main_menu"
+    self:set_screen("main_menu")
     self.state = nil
     self.ai_timer = 0
     self.cursor_cell = nil
@@ -499,17 +721,21 @@ end
 
 function Game:draw()
   if self.screen == "main_menu" then
-    render.draw_main_menu()
+    render.draw_main_menu(self:get_focused_menu_button_id())
     return
   end
 
   if self.screen == "play_menu" then
-    render.draw_play_menu(self.selected_board_size, self.selected_bot_difficulty)
+    render.draw_play_menu(
+      self.selected_board_size,
+      self.selected_bot_difficulty,
+      self:get_focused_menu_button_id()
+    )
     return
   end
 
   if self.screen == "settings_menu" then
-    render.draw_settings_menu(self.selected_resolution_id)
+    render.draw_settings_menu(self.selected_resolution_id, self:get_focused_menu_button_id())
     return
   end
 

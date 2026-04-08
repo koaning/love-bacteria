@@ -39,7 +39,7 @@ function Tests.update_auto_passes_blocked_player_without_input()
   local game = Game.new()
   game.ai_delay = 999
   game.state = blocked_player_state()
-  game.screen = "playing"
+  game:set_screen("playing")
 
   game:update(0)
 
@@ -51,7 +51,7 @@ function Tests.enemy_keeps_turn_when_player_remains_blocked()
   local game = Game.new()
   game.ai_delay = 0
   game.state = blocked_player_state()
-  game.screen = "playing"
+  game:set_screen("playing")
 
   game:update(0)
 
@@ -107,14 +107,14 @@ function Tests.main_menu_keyboard_shortcuts()
   game:keypressed("p")
   assert_equal(game.screen, "play_menu", "P key should open play menu")
 
-  game.screen = "main_menu"
+  game:set_screen("main_menu")
   game:keypressed("s")
   assert_equal(game.screen, "settings_menu", "S key should open settings menu")
 end
 
 function Tests.play_menu_keyboard_shortcuts()
   local game = Game.new()
-  game.screen = "play_menu"
+  game:set_screen("play_menu")
 
   game:keypressed("5")
   game:keypressed("e")
@@ -127,12 +127,31 @@ end
 
 function Tests.settings_menu_keyboard_shortcuts()
   local game = Game.new()
-  game.screen = "settings_menu"
+  game:set_screen("settings_menu")
 
   game:keypressed("1")
   assert_equal(game.selected_resolution_id, "res_700_700", "1 should pick smallest resolution")
   game:keypressed("3")
   assert_equal(game.selected_resolution_id, "res_960_800", "3 should pick largest resolution")
+end
+
+function Tests.main_menu_arrow_focus_selects_settings()
+  local game = Game.new()
+
+  game:keypressed("down")
+  game:keypressed("return")
+
+  assert_equal(game.screen, "settings_menu", "Arrow focus plus Enter should activate focused menu button")
+end
+
+function Tests.play_menu_arrow_focus_can_activate_back()
+  local game = Game.new()
+  game:set_screen("play_menu")
+
+  game:keypressed("left")
+  game:keypressed("return")
+
+  assert_equal(game.screen, "main_menu", "Arrow focus plus Enter should activate focused play menu button")
 end
 
 function Tests.playing_keyboard_cursor_can_select_and_move()
