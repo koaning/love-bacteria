@@ -55,6 +55,42 @@ local function draw_background(width, height)
   end
 end
 
+local function draw_panel(x, y, width, height, radius)
+  set_color(palette.panel)
+  love.graphics.rectangle("fill", x, y, width, height, radius, radius)
+  set_color(palette.panel_edge)
+  love.graphics.setLineWidth(2)
+  love.graphics.rectangle("line", x, y, width, height, radius, radius)
+  love.graphics.setLineWidth(1)
+end
+
+local function draw_button(button, active)
+  local fill = palette.cell
+  local edge = palette.cell_edge
+
+  if active then
+    fill = palette.grow
+    edge = palette.grow_edge
+  end
+
+  set_color(fill)
+  love.graphics.rectangle("fill", button.x, button.y, button.width, button.height, 12, 12)
+  set_color(edge)
+  love.graphics.setLineWidth(2)
+  love.graphics.rectangle("line", button.x, button.y, button.width, button.height, 12, 12)
+  love.graphics.setLineWidth(1)
+
+  love.graphics.setFont(fonts.body)
+  set_color(palette.text)
+  love.graphics.printf(
+    button.label,
+    button.x,
+    button.y + math.floor((button.height - 16) * 0.5),
+    button.width,
+    "center"
+  )
+end
+
 local function build_move_lookup(state)
   local lookup = {}
 
@@ -153,6 +189,103 @@ local function draw_progress_bar(state, layout)
   love.graphics.rectangle("line", bar_x, bar_y, bar_width, bar_height, 8, 8)
 end
 
+function Render.get_main_menu_ui(width, height)
+  local panel_width = 420
+  local panel_height = 270
+  local panel_x = math.floor((width - panel_width) * 0.5)
+  local panel_y = math.floor((height - panel_height) * 0.5)
+
+  return {
+    panel = {
+      x = panel_x,
+      y = panel_y,
+      width = panel_width,
+      height = panel_height,
+    },
+    buttons = {
+      {
+        id = "play",
+        label = "Play",
+        x = panel_x + 70,
+        y = panel_y + 118,
+        width = panel_width - 140,
+        height = 50,
+      },
+      {
+        id = "quit",
+        label = "Quit",
+        x = panel_x + 70,
+        y = panel_y + 182,
+        width = panel_width - 140,
+        height = 50,
+      },
+    },
+  }
+end
+
+function Render.get_play_menu_ui(width, height)
+  local panel_width = 520
+  local panel_height = 330
+  local panel_x = math.floor((width - panel_width) * 0.5)
+  local panel_y = math.floor((height - panel_height) * 0.5)
+  local option_width = 120
+  local option_height = 54
+  local gap = 20
+  local options_x = panel_x + math.floor((panel_width - ((option_width * 3) + (gap * 2))) * 0.5)
+  local options_y = panel_y + 130
+
+  return {
+    panel = {
+      x = panel_x,
+      y = panel_y,
+      width = panel_width,
+      height = panel_height,
+    },
+    buttons = {
+      {
+        id = "size_5",
+        label = "5x5",
+        x = options_x,
+        y = options_y,
+        width = option_width,
+        height = option_height,
+      },
+      {
+        id = "size_7",
+        label = "7x7",
+        x = options_x + option_width + gap,
+        y = options_y,
+        width = option_width,
+        height = option_height,
+      },
+      {
+        id = "size_9",
+        label = "9x9",
+        x = options_x + ((option_width + gap) * 2),
+        y = options_y,
+        width = option_width,
+        height = option_height,
+      },
+      {
+        id = "back",
+        label = "Back",
+        x = panel_x + 56,
+        y = panel_y + 242,
+        width = 180,
+        height = 50,
+      },
+      {
+        id = "start",
+        label = "Start",
+        x = panel_x + panel_width - 236,
+        y = panel_y + 242,
+        width = 180,
+        height = 50,
+      },
+    },
+  }
+end
+
 local function draw_overlay(state, width, height)
   local title = "Tie"
 
@@ -191,6 +324,52 @@ local function draw_overlay(state, width, height)
     board.count_cells(state, "player"),
     board.count_cells(state, "enemy")
   ), panel_x, panel_y + 96, panel_width, "center")
+end
+
+function Render.draw_main_menu()
+  local width, height = love.graphics.getDimensions()
+  local ui = Render.get_main_menu_ui(width, height)
+
+  draw_background(width, height)
+  draw_panel(ui.panel.x, ui.panel.y, ui.panel.width, ui.panel.height, 20)
+
+  love.graphics.setFont(fonts.title)
+  set_color(palette.text)
+  love.graphics.printf("Bacteria", ui.panel.x, ui.panel.y + 42, ui.panel.width, "center")
+
+  for _, button in ipairs(ui.buttons) do
+    draw_button(button, false)
+  end
+end
+
+function Render.draw_play_menu(selected_size)
+  local width, height = love.graphics.getDimensions()
+  local ui = Render.get_play_menu_ui(width, height)
+
+  draw_background(width, height)
+  draw_panel(ui.panel.x, ui.panel.y, ui.panel.width, ui.panel.height, 20)
+
+  love.graphics.setFont(fonts.title)
+  set_color(palette.text)
+  love.graphics.printf("Play", ui.panel.x, ui.panel.y + 32, ui.panel.width, "center")
+
+  love.graphics.setFont(fonts.body)
+  set_color(palette.text_muted)
+  love.graphics.printf("Board Size", ui.panel.x, ui.panel.y + 92, ui.panel.width, "center")
+
+  for _, button in ipairs(ui.buttons) do
+    local active = false
+
+    if button.id == "size_5" then
+      active = selected_size == 5
+    elseif button.id == "size_7" then
+      active = selected_size == 7
+    elseif button.id == "size_9" then
+      active = selected_size == 9
+    end
+
+    draw_button(button, active)
+  end
 end
 
 function Render.load()

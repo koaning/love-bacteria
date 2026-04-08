@@ -31,14 +31,16 @@ luajit tests/run.lua
 
 ## Controls
 
+- Main menu: click `Play`, choose `5x5`, `7x7`, or `9x9`, then click `Start`.
 - Left click one of your bacteria to select it.
 - Left click a highlighted cell to move.
 - `R` restarts the board.
-- `Esc` quits.
+- `Esc` returns to the main menu.
+- `Esc` on the main menu quits.
 
 ## Rules
 
-- The board is a fixed 7x7 grid.
+- The board size is chosen before play: `5x5`, `7x7`, or `9x9`.
 - You control the teal bacteria. The AI controls the orange bacteria.
 - A grow move places a new bacterium into any adjacent cell, including diagonals.
 - A jump move moves a bacterium exactly 2 cells up, down, left, or right, and leaves the origin empty.
@@ -56,7 +58,7 @@ luajit tests/run.lua
 - `src/ai.lua` contains a deterministic one-ply enemy heuristic.
 - `src/render.lua` draws the board, HUD, highlights, and end-game overlay.
 - `src/input.lua` handles simple mouse and keyboard helpers.
-- `src/level.lua` defines the single starting layout.
+- `src/level.lua` defines the starting layout for the chosen board size.
 - `src/game.lua` coordinates turn flow and AI timing.
 
 ## Notes

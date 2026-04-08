@@ -39,6 +39,7 @@ function Tests.update_auto_passes_blocked_player_without_input()
   local game = Game.new()
   game.ai_delay = 999
   game.state = blocked_player_state()
+  game.screen = "playing"
 
   game:update(0)
 
@@ -50,12 +51,26 @@ function Tests.enemy_keeps_turn_when_player_remains_blocked()
   local game = Game.new()
   game.ai_delay = 0
   game.state = blocked_player_state()
+  game.screen = "playing"
 
   game:update(0)
 
   assert_truthy(game.state.last_move, "Enemy should make a move after player pass")
   assert_equal(game.state.current_player, "enemy", "Turn should remain with enemy if player is still blocked")
   assert_equal(#rules.get_legal_moves(game.state, "player"), 0, "Player should still have no moves")
+end
+
+function Tests.start_game_uses_selected_board_size()
+  local game = Game.new()
+
+  game:start_game(5)
+  assert_equal(game.screen, "playing", "Start game should enter playing screen")
+  assert_equal(game.state.width, 5, "Board width should match configured size")
+  assert_equal(game.state.height, 5, "Board height should match configured size")
+
+  game:start_game(9)
+  assert_equal(game.state.width, 9, "Board width should update to new configured size")
+  assert_equal(game.state.height, 9, "Board height should update to new configured size")
 end
 
 return Tests

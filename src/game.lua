@@ -8,18 +8,41 @@ local rules = require("src.rules")
 local Game = {}
 Game.__index = Game
 
+local function point_in_rect(x, y, rect)
+  return x >= rect.x
+    and x <= rect.x + rect.width
+    and y >= rect.y
+    and y <= rect.y + rect.height
+end
+
 function Game.new()
   local self = setmetatable({}, Game)
 
   self.ai_delay = 0.45
   self.ai_timer = 0
-  self.state = rules.resolve_state(level.load())
+  self.state = nil
+  self.screen = "main_menu"
+  self.selected_board_size = 7
+  self.board_size = 7
 
   return self
 end
 
+function Game:start_game(board_size)
+  local size = board_size or self.selected_board_size or 7
+  self.selected_board_size = size
+  self.board_size = size
+  self.state = rules.resolve_state(level.load(size))
+  self.screen = "playing"
+  self.ai_timer = 0
+end
+
 function Game:restart()
-  self.state = rules.resolve_state(level.load())
+  if self.screen ~= "playing" then
+    return
+  end
+
+  self.state = rules.resolve_state(level.load(self.board_size))
   self.ai_timer = 0
 end
 
@@ -28,7 +51,66 @@ function Game:commit_move(move)
   self.ai_timer = 0
 end
 
+function Game:find_clicked_button(buttons, x, y)
+  for _, button in ipairs(buttons) do
+    if point_in_rect(x, y, button) then
+      return button.id
+    end
+  end
+
+  return nil
+end
+
+function Game:handle_main_menu_click(x, y)
+  local width, height = love.graphics.getDimensions()
+  local ui = render.get_main_menu_ui(width, height)
+  local button_id = self:find_clicked_button(ui.buttons, x, y)
+
+  if button_id == "play" then
+    self.screen = "play_menu"
+    return
+  end
+
+  if button_id == "quit" then
+    love.event.quit()
+  end
+end
+
+function Game:handle_play_menu_click(x, y)
+  local width, height = love.graphics.getDimensions()
+  local ui = render.get_play_menu_ui(width, height)
+  local button_id = self:find_clicked_button(ui.buttons, x, y)
+
+  if button_id == "size_5" then
+    self.selected_board_size = 5
+    return
+  end
+
+  if button_id == "size_7" then
+    self.selected_board_size = 7
+    return
+  end
+
+  if button_id == "size_9" then
+    self.selected_board_size = 9
+    return
+  end
+
+  if button_id == "back" then
+    self.screen = "main_menu"
+    return
+  end
+
+  if button_id == "start" then
+    self:start_game(self.selected_board_size)
+  end
+end
+
 function Game:run_enemy_turn()
+  if self.screen ~= "playing" or not self.state then
+    return
+  end
+
   if self.state.winner or self.state.current_player ~= "enemy" then
     return
   end
@@ -45,6 +127,10 @@ function Game:run_enemy_turn()
 end
 
 function Game:resolve_forced_pass()
+  if self.screen ~= "playing" or not self.state then
+    return
+  end
+
   if self.state.winner then
     return
   end
@@ -61,6 +147,10 @@ function Game:resolve_forced_pass()
 end
 
 function Game:update(dt)
+  if self.screen ~= "playing" or not self.state then
+    return
+  end
+
   self:resolve_forced_pass()
 
   if self.state.winner then
@@ -80,6 +170,20 @@ end
 
 function Game:mousepressed(x, y, button)
   if not input.is_primary_click(button) then
+    return
+  end
+
+  if self.screen == "main_menu" then
+    self:handle_main_menu_click(x, y)
+    return
+  end
+
+  if self.screen == "play_menu" then
+    self:handle_play_menu_click(x, y)
+    return
+  end
+
+  if self.screen ~= "playing" or not self.state then
     return
   end
 
@@ -117,18 +221,46 @@ function Game:mousepressed(x, y, button)
 end
 
 function Game:keypressed(key)
+  if self.screen == "main_menu" then
+    if input.is_quit_key(key) then
+      love.event.quit()
+    end
+    return
+  end
+
+  if self.screen == "play_menu" then
+    if input.is_quit_key(key) then
+      self.screen = "main_menu"
+    end
+    return
+  end
+
   if input.is_restart_key(key) then
     self:restart()
     return
   end
 
   if input.is_quit_key(key) then
-    love.event.quit()
+    self.screen = "main_menu"
+    self.state = nil
+    self.ai_timer = 0
   end
 end
 
 function Game:draw()
-  render.draw(self.state)
+  if self.screen == "main_menu" then
+    render.draw_main_menu()
+    return
+  end
+
+  if self.screen == "play_menu" then
+    render.draw_play_menu(self.selected_board_size)
+    return
+  end
+
+  if self.state then
+    render.draw(self.state)
+  end
 end
 
 return Game
