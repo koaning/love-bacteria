@@ -110,7 +110,7 @@ local function draw_piece(px, py, size, side)
   love.graphics.circle("fill", cx - radius * 0.22, cy - radius * 0.22, radius * 0.44)
 end
 
-local function draw_header(state, width)
+local function draw_header(state)
   local player_count = board.count_cells(state, "player")
   local enemy_count = board.count_cells(state, "enemy")
   local turn_text = "Turn: Player"
@@ -135,49 +135,6 @@ local function draw_header(state, width)
   set_color(palette.text)
   love.graphics.print(turn_text, 48, 70)
   love.graphics.print(("Player %d  |  Enemy %d"):format(player_count, enemy_count), 220, 70)
-
-  love.graphics.setFont(fonts.small)
-  set_color(palette.text_muted)
-  love.graphics.printf(
-    "Click one of your bacteria, then click a highlighted cell. Green grows, blue jumps. R restarts. Esc quits.",
-    48,
-    97,
-    width - 96,
-    "left"
-  )
-
-  if state.status_text then
-    set_color(palette.text_muted)
-    love.graphics.printf(state.status_text, 48, 118, width - 96, "left")
-  end
-end
-
-local function draw_legend(width, height)
-  local y = height - 42
-  local x = 48
-
-  love.graphics.setFont(fonts.small)
-
-  set_color(palette.grow)
-  love.graphics.circle("fill", x, y + 9, 9)
-  set_color(palette.grow_edge)
-  love.graphics.circle("line", x, y + 9, 9)
-  set_color(palette.text_muted)
-  love.graphics.print("Grow", x + 18, y)
-
-  x = x + 88
-  set_color(palette.jump)
-  love.graphics.circle("fill", x, y + 9, 9)
-  set_color(palette.jump_edge)
-  love.graphics.circle("line", x, y + 9, 9)
-  set_color(palette.text_muted)
-  love.graphics.print("Jump", x + 18, y)
-
-  x = x + 88
-  set_color(palette.selected)
-  love.graphics.circle("line", x, y + 9, 9)
-  set_color(palette.text_muted)
-  love.graphics.print("Selected", x + 18, y)
 end
 
 local function draw_overlay(state, width, height)
@@ -214,8 +171,10 @@ local function draw_overlay(state, width, height)
 
   love.graphics.setFont(fonts.body)
   set_color(palette.text_muted)
-  love.graphics.printf(state.status_text or "", panel_x + 24, panel_y + 84, panel_width - 48, "center")
-  love.graphics.printf("Press R to restart.", panel_x, panel_y + 130, panel_width, "center")
+  love.graphics.printf(("Player %d  |  Enemy %d"):format(
+    board.count_cells(state, "player"),
+    board.count_cells(state, "enemy")
+  ), panel_x, panel_y + 96, panel_width, "center")
 end
 
 function Render.load()
@@ -225,8 +184,8 @@ function Render.load()
 end
 
 function Render.get_layout(width, height, state)
-  local top_height = 162
-  local bottom_margin = 72
+  local top_height = 116
+  local bottom_margin = 20
   local max_board_width = width - 120
   local max_board_height = height - top_height - bottom_margin
   local cell_size = math.floor(math.min(max_board_width / state.width, max_board_height / state.height))
@@ -257,7 +216,7 @@ function Render.draw(state)
   local move_lookup = build_move_lookup(state)
 
   draw_background(width, height)
-  draw_header(state, width)
+  draw_header(state)
 
   love.graphics.setColor(
     palette.board_shadow[1],
@@ -338,8 +297,6 @@ function Render.draw(state)
       end
     end
   end
-
-  draw_legend(width, height)
 
   if state.winner then
     draw_overlay(state, width, height)

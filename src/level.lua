@@ -10,8 +10,6 @@ function Level.load()
   board.set_cell(state, 1, 7, "enemy")
   board.set_cell(state, 7, 1, "enemy")
 
-  state.status_text = "Grow into any adjacent cell or jump two spaces orthogonally."
-
   return state
 end
 
