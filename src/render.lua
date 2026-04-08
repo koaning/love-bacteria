@@ -110,31 +110,52 @@ local function draw_piece(px, py, size, side)
   love.graphics.circle("fill", cx - radius * 0.22, cy - radius * 0.22, radius * 0.44)
 end
 
-local function draw_header(state)
+local function draw_progress_bar(state, width)
   local player_count = board.count_cells(state, "player")
   local enemy_count = board.count_cells(state, "enemy")
-  local turn_text = "Turn: Player"
+  local total_cells = state.width * state.height
+  local player_ratio = player_count / total_cells
+  local enemy_ratio = enemy_count / total_cells
+  local player_percent = math.floor((player_ratio * 100) + 0.5)
+  local enemy_percent = math.floor((enemy_ratio * 100) + 0.5)
+  local bar_x = 48
+  local bar_y = 42
+  local bar_width = width - 96
+  local bar_height = 16
+  local player_width = math.floor((bar_width * player_ratio) + 0.5)
+  local enemy_width = math.floor((bar_width * enemy_ratio) + 0.5)
 
-  if state.current_player == "enemy" and not state.winner then
-    turn_text = "Turn: Enemy"
+  if player_width + enemy_width > bar_width then
+    local overflow = player_width + enemy_width - bar_width
+    if enemy_width >= overflow then
+      enemy_width = enemy_width - overflow
+    else
+      player_width = player_width - (overflow - enemy_width)
+      enemy_width = 0
+    end
   end
 
-  if state.winner == "player" then
-    turn_text = "Player Wins"
-  elseif state.winner == "enemy" then
-    turn_text = "Enemy Wins"
-  elseif state.winner == "tie" then
-    turn_text = "Tie Game"
-  end
+  love.graphics.setFont(fonts.small)
+  set_color(palette.player)
+  love.graphics.print(("%d%%"):format(player_percent), bar_x, bar_y - 20)
+  set_color(palette.enemy)
+  love.graphics.printf(("%d%%"):format(enemy_percent), bar_x, bar_y - 20, bar_width, "right")
 
-  love.graphics.setFont(fonts.title)
-  set_color(palette.text)
-  love.graphics.print("Bacteria Prototype", 48, 32)
+  set_color(palette.cell)
+  love.graphics.rectangle("fill", bar_x, bar_y, bar_width, bar_height, 8, 8)
+  set_color(palette.player)
+  love.graphics.rectangle("fill", bar_x, bar_y, player_width, bar_height, 8, 8)
+  set_color(palette.enemy)
+  love.graphics.rectangle("fill", bar_x + bar_width - enemy_width, bar_y, enemy_width, bar_height, 8, 8)
 
+  set_color(palette.panel_edge)
+  love.graphics.setLineWidth(2)
+  love.graphics.rectangle("line", bar_x, bar_y, bar_width, bar_height, 8, 8)
+
+  love.graphics.setLineWidth(1)
   love.graphics.setFont(fonts.body)
   set_color(palette.text)
-  love.graphics.print(turn_text, 48, 70)
-  love.graphics.print(("Player %d  |  Enemy %d"):format(player_count, enemy_count), 220, 70)
+  love.graphics.printf(("Turn: %s"):format(state.current_player == "player" and "Player" or "Enemy"), bar_x, bar_y + 24, bar_width, "center")
 end
 
 local function draw_overlay(state, width, height)
@@ -184,7 +205,7 @@ function Render.load()
 end
 
 function Render.get_layout(width, height, state)
-  local top_height = 116
+  local top_height = 92
   local bottom_margin = 20
   local max_board_width = width - 120
   local max_board_height = height - top_height - bottom_margin
@@ -216,7 +237,7 @@ function Render.draw(state)
   local move_lookup = build_move_lookup(state)
 
   draw_background(width, height)
-  draw_header(state)
+  draw_progress_bar(state, width)
 
   love.graphics.setColor(
     palette.board_shadow[1],
