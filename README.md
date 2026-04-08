@@ -29,6 +29,16 @@ Run the lightweight Lua test suite:
 luajit tests/run.lua
 ```
 
+## Build
+
+Create distributable output:
+
+```bash
+make build
+```
+
+This creates `dist/bacteria.love` and, on macOS, a standalone app bundle at `dist/Bacteria.app`.
+
 ## Controls
 
 - Main menu: click `Play`, choose `5x5`, `7x7`, or `9x9`, pick bot difficulty (`Easy` or `Hard`), then click `Start`.
