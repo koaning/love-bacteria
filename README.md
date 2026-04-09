@@ -48,6 +48,7 @@ This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `di
 - Left click one of your bacteria to select it.
 - Left click a highlighted cell to move.
 - In game keyboard: `Arrow keys` move the cursor, `Enter`/`Space` select and move.
+- `M` toggles mute (`Shift+M` while in the play menu to avoid clashing with medium difficulty hotkey).
 - `F` or `F11` toggles fullscreen.
 - `R` restarts the board.
 - `Esc` returns to the main menu.
@@ -73,7 +74,8 @@ This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `di
 - `src/ai.lua` contains enemy move selection logic for easy/medium/hard difficulties.
 - `src/render.lua` draws the board, HUD, highlights, and end-game overlay.
 - `src/input.lua` handles simple mouse and keyboard helpers.
-- `src/audio.lua` provides lightweight generated sound effects.
+- `src/audio.lua` manages SFX, mute state, and menu/game music track fading.
+- `assets/audio/` (optional) can provide custom `sfx/*.ogg` and `music/{menu,game}.ogg` files.
 - `src/level.lua` defines the starting layout for the chosen board size.
 - `src/game.lua` coordinates turn flow and AI timing.
 - `assets/fonts/` contains bundled UI fonts used for title/body typography.

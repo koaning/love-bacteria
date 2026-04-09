@@ -37,6 +37,8 @@ local palette = {
   jump_edge = { 0.62, 0.76, 1.00, 0.95 },
   text = { 0.93, 0.95, 0.98, 1.0 },
   text_muted = { 0.68, 0.73, 0.81, 1.0 },
+  audio_on = { 0.13, 0.28, 0.24, 0.92 },
+  audio_off = { 0.31, 0.16, 0.13, 0.92 },
   overlay = { 0.01, 0.02, 0.03, 0.70 },
 }
 
@@ -188,6 +190,49 @@ local function draw_button(button, active, focused, hovered, pulse_time, y_offse
   )
 end
 
+local function draw_audio_status_badge(width, height, audio_status, alpha_multiplier, y_position)
+  if not audio_status then
+    return
+  end
+
+  local text = audio_status.text or "Audio"
+  local hint = audio_status.hint or "M"
+  local label = ("%s [%s]"):format(text, hint)
+  local muted = audio_status.muted == true
+  local y = y_position or 14
+
+  love.graphics.setFont(fonts.small)
+
+  local text_width = fonts.small:getWidth(label)
+  local text_height = fonts.small:getHeight()
+  local box_width = text_width + 26
+  local box_height = text_height + 12
+  local x = width - box_width - 18
+
+  if y + box_height > height - 8 then
+    y = math.max(8, height - box_height - 8)
+  end
+
+  if muted then
+    set_color(palette.audio_off, alpha_multiplier)
+  else
+    set_color(palette.audio_on, alpha_multiplier)
+  end
+  love.graphics.rectangle("fill", x, y, box_width, box_height, 10, 10)
+
+  if muted then
+    set_color(palette.enemy, alpha_multiplier)
+  else
+    set_color(palette.grow_edge, alpha_multiplier)
+  end
+  love.graphics.setLineWidth(2)
+  love.graphics.rectangle("line", x, y, box_width, box_height, 10, 10)
+  love.graphics.setLineWidth(1)
+
+  set_color(palette.text, alpha_multiplier)
+  love.graphics.print(label, x + 13, y + math.floor((box_height - text_height) * 0.5))
+end
+
 local function build_move_lookup(state, preview_cell)
   local lookup = {}
   local source_cell = nil
@@ -227,6 +272,16 @@ local function cell_rect(layout, x, y)
   local py = layout.origin_y + (y - 1) * layout.cell_size
 
   return px, py, layout.cell_size, layout.cell_size
+end
+
+local function cell_center(layout, x, y)
+  local px, py, size = cell_rect(layout, x, y)
+  return px + (size * 0.5), py + (size * 0.5), size
+end
+
+local function smoothstep(t)
+  local value = clamp(t, 0, 1)
+  return value * value * (3 - (2 * value))
 end
 
 local function draw_piece(px, py, size, side, animation, alpha_multiplier, lift_amount)
@@ -277,6 +332,235 @@ local function draw_piece(px, py, size, side, animation, alpha_multiplier, lift_
 
   set_color(core, alpha)
   love.graphics.circle("fill", cx - radius * 0.22, cy - radius * 0.22, radius * 0.44)
+end
+
+local function draw_blob(cx, cy, radius, side, alpha_multiplier, scale)
+  local base = palette.player
+  local core = palette.player_core
+  local factor = scale or 1
+
+  if side == "enemy" then
+    base = palette.enemy
+    core = palette.enemy_core
+  end
+
+  local r = radius * factor
+
+  love.graphics.setColor(0, 0, 0, 0.18 * alpha_multiplier)
+  love.graphics.circle("fill", cx + 2, cy + 4, r * 1.02)
+
+  set_color(base, alpha_multiplier)
+  love.graphics.circle("fill", cx, cy, r)
+
+  set_color(core, alpha_multiplier)
+  love.graphics.circle("fill", cx - (r * 0.20), cy - (r * 0.20), r * 0.42)
+end
+
+local function draw_blob_scaled(cx, cy, radius, side, alpha_multiplier, scale_x, scale_y)
+  local base = palette.player
+  local core = palette.player_core
+  local sx = scale_x or 1
+  local sy = scale_y or 1
+
+  if side == "enemy" then
+    base = palette.enemy
+    core = palette.enemy_core
+  end
+
+  love.graphics.push()
+  love.graphics.translate(cx, cy)
+  love.graphics.scale(sx, sy)
+
+  love.graphics.setColor(0, 0, 0, 0.16 * alpha_multiplier)
+  love.graphics.circle("fill", 2, 4, radius * 1.02)
+
+  set_color(base, alpha_multiplier)
+  love.graphics.circle("fill", 0, 0, radius)
+
+  set_color(core, alpha_multiplier)
+  love.graphics.circle("fill", -(radius * 0.20), -(radius * 0.20), radius * 0.42)
+  love.graphics.pop()
+end
+
+local function normalize(dx, dy)
+  local length = math.sqrt((dx * dx) + (dy * dy))
+
+  if length <= 0.0001 then
+    return 0, 0, 0
+  end
+
+  return dx / length, dy / length, length
+end
+
+local function draw_capture_sparks(cx, cy, side, alpha_multiplier, energy, progress, cell_size)
+  local count = 5 + math.floor(energy * 7)
+  local radius = cell_size * (0.28 + (0.90 * progress))
+  local core_color = palette.player_core
+
+  if side == "enemy" then
+    core_color = palette.enemy_core
+  end
+
+  love.graphics.setLineWidth(1.2 + (energy * 1.6))
+  for index = 1, count do
+    local step = index / count
+    local angle = (step * math.pi * 2) + (progress * 6.8) + (index * 0.31)
+    local inner_radius = radius * (0.48 + (0.10 * math.sin(progress * math.pi)))
+    local outer_radius = radius * (0.94 + (0.15 * energy))
+    local x1 = cx + (math.cos(angle) * inner_radius)
+    local y1 = cy + (math.sin(angle) * inner_radius * 0.86)
+    local x2 = cx + (math.cos(angle) * outer_radius)
+    local y2 = cy + (math.sin(angle) * outer_radius * 0.86)
+    local spark_alpha = alpha_multiplier * (1 - progress) * (0.55 + (energy * 0.30))
+
+    love.graphics.setColor(core_color[1], core_color[2], core_color[3], spark_alpha)
+    love.graphics.line(x1, y1, x2, y2)
+  end
+  love.graphics.setLineWidth(1)
+end
+
+local function draw_move_animation(layout, move_animation, alpha_multiplier)
+  if not move_animation or not move_animation.from or not move_animation.to then
+    return
+  end
+
+  local progress = clamp(move_animation.progress or 0, 0, 1)
+  local eased = smoothstep(progress)
+  local from_x, from_y, cell_size = cell_center(layout, move_animation.from.x, move_animation.from.y)
+  local to_x, to_y = cell_center(layout, move_animation.to.x, move_animation.to.y)
+  local side = move_animation.side or "player"
+  local converted = move_animation.converted or 0
+  local capture_energy = clamp((converted - 2) / 4, 0, 1)
+  local radius = cell_size * 0.30
+  local dx = to_x - from_x
+  local dy = to_y - from_y
+  local nx, ny = normalize(dx, dy)
+  local px = -ny
+  local py = nx
+
+  if move_animation.kind == "grow" then
+    local bud_x = from_x + ((to_x - from_x) * eased)
+    local bud_y = from_y + ((to_y - from_y) * eased)
+    local tether_alpha = alpha_multiplier * (0.30 + (0.25 * capture_energy)) * (1 - progress)
+    local bridge_alpha = alpha_multiplier * (0.24 + (0.24 * capture_energy)) * (1 - (progress * 0.55))
+    local source_width = radius * (0.16 + (0.12 * (1 - progress)))
+    local bud_width = radius * (0.24 + (0.34 * eased))
+    local wobble = math.sin(progress * math.pi * 2.2) * (radius * 0.08)
+
+    if side == "enemy" then
+      set_color(palette.enemy, tether_alpha)
+    else
+      set_color(palette.player, tether_alpha)
+    end
+
+    love.graphics.polygon(
+      "fill",
+      from_x + (px * source_width),
+      from_y + (py * source_width),
+      bud_x + (px * bud_width) + (nx * wobble),
+      bud_y + (py * bud_width) + (ny * wobble),
+      bud_x - (px * bud_width) + (nx * wobble),
+      bud_y - (py * bud_width) + (ny * wobble),
+      from_x - (px * source_width),
+      from_y - (py * source_width)
+    )
+
+    if side == "enemy" then
+      set_color(palette.enemy_core, bridge_alpha)
+    else
+      set_color(palette.player_core, bridge_alpha)
+    end
+    love.graphics.setLineWidth(math.max(1.2, cell_size * 0.09 * (1 - progress)))
+    love.graphics.line(from_x, from_y, bud_x, bud_y)
+    love.graphics.setLineWidth(1)
+
+    draw_blob_scaled(
+      from_x,
+      from_y,
+      radius,
+      side,
+      alpha_multiplier * (0.28 + ((1 - progress) * 0.50)),
+      1.02 + (progress * 0.12),
+      1.00 - (progress * 0.10)
+    )
+
+    draw_blob_scaled(
+      bud_x,
+      bud_y,
+      radius,
+      side,
+      alpha_multiplier * (0.24 + (0.76 * progress)),
+      0.38 + (0.76 * eased),
+      0.46 + (0.66 * eased)
+    )
+  else
+    local jump_x = from_x + ((to_x - from_x) * eased)
+    local jump_y = from_y + ((to_y - from_y) * eased) - (math.sin(progress * math.pi) * cell_size * 0.28)
+    local jump_stretch = 1.0 + (math.sin(progress * math.pi) * 0.24)
+    local jump_squash = 1.0 - (math.sin(progress * math.pi) * 0.18)
+
+    for trail_index = 1, 4 do
+      local trail_progress = progress - (trail_index * 0.10)
+
+      if trail_progress > 0 then
+        local trail_eased = smoothstep(trail_progress)
+        local trail_x = from_x + ((to_x - from_x) * trail_eased)
+        local trail_y = from_y + ((to_y - from_y) * trail_eased)
+          - (math.sin(trail_progress * math.pi) * cell_size * 0.24)
+        local trail_alpha = alpha_multiplier * (0.18 - (trail_index * 0.03)) * (1 - progress)
+
+        draw_blob(
+          trail_x,
+          trail_y,
+          radius * (0.88 - (trail_index * 0.07)),
+          side,
+          trail_alpha,
+          0.92
+        )
+      end
+    end
+
+    draw_blob_scaled(
+      jump_x,
+      jump_y,
+      radius,
+      side,
+      alpha_multiplier * (0.30 + (0.60 * (1 - (progress * 0.20)))),
+      0.92 * jump_stretch,
+      0.98 * jump_squash
+    )
+
+    if progress > 0.72 then
+      local land = clamp((progress - 0.72) / 0.28, 0, 1)
+      local land_radius = (cell_size * 0.24) + (cell_size * 0.68 * land)
+      local land_alpha = alpha_multiplier * (1 - land) * (0.34 + (capture_energy * 0.26))
+
+      if side == "enemy" then
+        set_color(palette.enemy, land_alpha)
+      else
+        set_color(palette.player, land_alpha)
+      end
+      love.graphics.setLineWidth(1.2 + ((1 - land) * 2.2))
+      love.graphics.circle("line", to_x, to_y, land_radius)
+      love.graphics.setLineWidth(1)
+    end
+  end
+
+  if capture_energy > 0 then
+    local burst = smoothstep(clamp((progress - 0.18) / 0.82, 0, 1))
+    local ring_radius = (cell_size * 0.34) + (cell_size * 0.90 * burst)
+    local ring_alpha = alpha_multiplier * capture_energy * (1 - burst) * 0.70
+
+    if side == "enemy" then
+      set_color(palette.enemy_core, ring_alpha)
+    else
+      set_color(palette.player_core, ring_alpha)
+    end
+    love.graphics.setLineWidth(1.2 + (capture_energy * 1.8))
+    love.graphics.circle("line", to_x, to_y, ring_radius)
+    love.graphics.setLineWidth(1)
+    draw_capture_sparks(to_x, to_y, side, alpha_multiplier, capture_energy, burst, cell_size)
+  end
 end
 
 local function mouse_to_cell(layout)
@@ -507,7 +791,7 @@ local function draw_overlay(state, width, height)
   ), panel_x, panel_y + 96, panel_width, "center")
 end
 
-function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time)
+function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time, audio_status)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_main_menu_ui(width, height)
   local transition = clamp(menu_transition or 1, 0, 1)
@@ -521,6 +805,7 @@ function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time)
   love.graphics.setFont(fonts.title)
   set_color(palette.text, transition)
   love.graphics.printf("Sporeline", ui.panel.x, ui.panel.y + 34, ui.panel.width, "center")
+  draw_audio_status_badge(width, height, audio_status, transition, 18)
 
   for _, button in ipairs(ui.buttons) do
     draw_button(
@@ -540,7 +825,7 @@ function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time)
   end
 end
 
-function Render.draw_play_menu(selected_size, selected_difficulty, focused_button_id, menu_transition, pulse_time)
+function Render.draw_play_menu(selected_size, selected_difficulty, focused_button_id, menu_transition, pulse_time, audio_status)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_play_menu_ui(width, height)
   local transition = clamp(menu_transition or 1, 0, 1)
@@ -554,6 +839,7 @@ function Render.draw_play_menu(selected_size, selected_difficulty, focused_butto
   love.graphics.setFont(fonts.title)
   set_color(palette.text, transition)
   love.graphics.printf("Play", ui.panel.x, ui.panel.y + 30, ui.panel.width, "center")
+  draw_audio_status_badge(width, height, audio_status, transition, 18)
 
   love.graphics.setFont(fonts.section)
   set_color(palette.text_muted, transition)
@@ -636,6 +922,8 @@ function Render.draw(state, view)
   local hovered_cell = nil
   local preview_cell = nil
   local move_source = nil
+  local move_animation = nil
+  local audio_status = nil
 
   if view and view.cursor_cell then
     cursor_cell = view.cursor_cell
@@ -651,6 +939,14 @@ function Render.draw(state, view)
 
   if view and view.ui_time ~= nil then
     ui_time = view.ui_time
+  end
+
+  if view and view.audio_status then
+    audio_status = view.audio_status
+  end
+
+  if view and view.move_animation then
+    move_animation = view.move_animation
   end
 
   hovered_cell = mouse_to_cell(layout)
@@ -670,6 +966,7 @@ function Render.draw(state, view)
   refresh_fonts_for_size(width, height)
   draw_background(width, height)
   draw_progress_bar(state, layout, transition)
+  draw_audio_status_badge(width, height, audio_status, transition, height - 46)
 
   love.graphics.setColor(
     palette.board_shadow[1],
@@ -792,6 +1089,8 @@ function Render.draw(state, view)
       end
     end
   end
+
+  draw_move_animation(layout, move_animation, transition)
 
   if transition < 1 and not state.winner then
     love.graphics.setColor(0.01, 0.02, 0.03, (1 - transition) * 0.42)
