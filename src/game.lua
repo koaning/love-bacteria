@@ -1,4 +1,5 @@
 local ai = require("src.ai")
+local audio = require("src.audio")
 local board = require("src.board")
 local input = require("src.input")
 local level = require("src.level")
@@ -8,10 +9,12 @@ local rules = require("src.rules")
 local Game = {}
 Game.__index = Game
 
-local MENU_FADE_DURATION = 0.28
+local MENU_FADE_DURATION = 0.80
 local PLAY_FADE_DURATION = 0.24
 local PIECE_SPAWN_DURATION = 0.18
 local PIECE_CONVERT_DURATION = 0.24
+local CURSOR_REPEAT_DELAY = 0.22
+local CURSOR_REPEAT_INTERVAL = 0.07
 
 local MAIN_MENU_FOCUS = {
   play = { up = "quit", down = "quit", left = "quit", right = "quit" },
@@ -62,6 +65,13 @@ local function find_first_player_cell(state)
   return { x = 1, y = 1 }
 end
 
+local CURSOR_REPEAT_DIRECTIONS = {
+  { key = "up", dx = 0, dy = -1 },
+  { key = "down", dx = 0, dy = 1 },
+  { key = "left", dx = -1, dy = 0 },
+  { key = "right", dx = 1, dy = 0 },
+}
+
 local function animation_key(x, y)
   return y .. ":" .. x
 end
@@ -106,6 +116,7 @@ end
 function Game.new()
   local self = setmetatable({}, Game)
 
+  self.audio = audio.new()
   self.ai_delay = 0.45
   self.ai_timer = 0
   self.state = nil
@@ -119,6 +130,12 @@ function Game.new()
   self.play_transition = 1
   self.visual_time = 0
   self.piece_animations = {}
+  self.cursor_repeat = {
+    up = { held = false, elapsed = 0 },
+    down = { held = false, elapsed = 0 },
+    left = { held = false, elapsed = 0 },
+    right = { held = false, elapsed = 0 },
+  }
   self.menu_focus_index = nil
   self.screen = nil
   self:set_screen("main_menu")
@@ -129,6 +146,14 @@ end
 function Game:set_state(next_state, previous_state)
   self.state = next_state
   self.piece_animations = build_piece_animations(previous_state, next_state)
+end
+
+function Game:reset_cursor_repeat()
+  for _, direction in ipairs(CURSOR_REPEAT_DIRECTIONS) do
+    local repeat_state = self.cursor_repeat[direction.key]
+    repeat_state.held = false
+    repeat_state.elapsed = 0
+  end
 end
 
 function Game:start_game(board_size, bot_difficulty)
@@ -157,9 +182,16 @@ function Game:restart()
 end
 
 function Game:commit_move(move)
+  local moving_side = self.state and self.state.current_player
   local next_state = rules.resolve_state(rules.apply_move(self.state, move))
   self:set_state(next_state, self.state)
   self.ai_timer = 0
+
+  if moving_side == "player" then
+    self.audio:play("player_move")
+  elseif moving_side == "enemy" then
+    self.audio:play("enemy_move")
+  end
 end
 
 function Game:update_piece_animations(dt)
@@ -180,6 +212,42 @@ function Game:update_piece_animations(dt)
 
     if progress >= 1 then
       self.piece_animations[key] = nil
+    end
+  end
+end
+
+function Game:update_cursor_repeat(delta)
+  if not love or not love.keyboard or not love.keyboard.isDown then
+    return
+  end
+
+  for _, direction in ipairs(CURSOR_REPEAT_DIRECTIONS) do
+    local key = direction.key
+    local repeat_state = self.cursor_repeat[key]
+    local is_down = love.keyboard.isDown(key)
+
+    if not is_down then
+      repeat_state.held = false
+      repeat_state.elapsed = 0
+    else
+      if not repeat_state.held then
+        repeat_state.held = true
+      end
+
+      repeat_state.elapsed = repeat_state.elapsed + delta
+
+      if repeat_state.elapsed >= CURSOR_REPEAT_DELAY then
+        local overflow = repeat_state.elapsed - CURSOR_REPEAT_DELAY
+        local steps = math.floor(overflow / CURSOR_REPEAT_INTERVAL)
+
+        if steps > 0 then
+          for _ = 1, steps do
+            self:move_cursor(direction.dx, direction.dy)
+          end
+
+          repeat_state.elapsed = CURSOR_REPEAT_DELAY + (overflow - (steps * CURSOR_REPEAT_INTERVAL))
+        end
+      end
     end
   end
 end
@@ -239,13 +307,30 @@ function Game:set_screen(screen)
     self.menu_focus_index = nil
     self.menu_transition = 1
     self.play_transition = 0
+    self:reset_cursor_repeat()
+    self.audio:set_context("game")
     return
   end
 
   self.play_transition = 1
   self.menu_transition = 0
   self.menu_pulse_time = 0
+  self:reset_cursor_repeat()
   self.menu_focus_index = self:default_menu_focus_index(screen)
+  self.audio:set_context("menu")
+end
+
+function Game:toggle_fullscreen()
+  if not love or not love.window or not love.window.getFullscreen or not love.window.setFullscreen then
+    return
+  end
+
+  local is_fullscreen = love.window.getFullscreen()
+  local ok = pcall(love.window.setFullscreen, not is_fullscreen, "desktop")
+
+  if not ok then
+    pcall(love.window.setFullscreen, not is_fullscreen)
+  end
 end
 
 function Game:get_focused_menu_button_id()
@@ -303,6 +388,10 @@ function Game:move_menu_focus(direction)
   local next_id = mapping[current_id][direction]
   if next_id then
     self:set_menu_focus_by_id(next_id)
+
+    if next_id ~= current_id then
+      self.audio:play("navigate")
+    end
   end
 end
 
@@ -312,6 +401,8 @@ function Game:activate_focused_menu_button()
   if not button_id then
     return
   end
+
+  self.audio:play("confirm")
 
   if self.screen == "main_menu" then
     self:handle_main_menu_action(button_id)
@@ -353,6 +444,7 @@ function Game:handle_main_menu_click(x, y)
   end
 
   self.menu_focus_index = button_index
+  self.audio:play("confirm")
   self:handle_main_menu_action(button_id)
 end
 
@@ -413,6 +505,7 @@ function Game:handle_play_menu_click(x, y)
   end
 
   self.menu_focus_index = button_index
+  self.audio:play("confirm")
   self:handle_play_menu_action(button_id)
 end
 
@@ -534,6 +627,12 @@ function Game:update(dt)
     self.play_transition = math.min(1, self.play_transition + (delta / PLAY_FADE_DURATION))
   end
 
+  if not self.state.winner and self.state.current_player == "player" then
+    self:update_cursor_repeat(delta)
+  else
+    self:reset_cursor_repeat()
+  end
+
   self:update_piece_animations(delta)
   self:resolve_forced_pass()
 
@@ -607,6 +706,11 @@ function Game:mousepressed(x, y, button)
 end
 
 function Game:keypressed(key)
+  if input.is_fullscreen_key(key) then
+    self:toggle_fullscreen()
+    return
+  end
+
   if self.screen == "main_menu" then
     if key == "up" then
       self:move_menu_focus("up")

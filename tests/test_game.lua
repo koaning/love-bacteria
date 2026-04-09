@@ -198,6 +198,41 @@ function Tests.play_menu_arrow_focus_can_activate_medium_difficulty()
   assert_equal(game.screen, "play_menu", "Selecting difficulty should keep play menu open")
 end
 
+function Tests.fullscreen_hotkeys_toggle_window_mode()
+  local game = Game.new()
+  local previous_love = love
+  local fullscreen = false
+  local set_calls = 0
+
+  local ok, err = pcall(function()
+    love = {
+      window = {
+        getFullscreen = function()
+          return fullscreen
+        end,
+        setFullscreen = function(next_mode, mode_type)
+          fullscreen = next_mode
+          set_calls = set_calls + 1
+          assert_equal(mode_type, "desktop", "Fullscreen should use desktop mode")
+        end,
+      },
+    }
+
+    game:keypressed("f11")
+    assert_equal(fullscreen, true, "F11 should enable fullscreen")
+
+    game:keypressed("f")
+    assert_equal(fullscreen, false, "F should disable fullscreen when already enabled")
+    assert_equal(set_calls, 2, "Each fullscreen hotkey press should call window.setFullscreen once")
+  end)
+
+  love = previous_love
+
+  if not ok then
+    error(err, 2)
+  end
+end
+
 function Tests.playing_keyboard_cursor_can_select_and_move()
   local game = Game.new()
   game:start_game(7, "hard")
@@ -216,6 +251,34 @@ function Tests.playing_keyboard_cursor_can_select_and_move()
   game:keypressed("space")
   assert_equal(board.get_cell(game.state, 2, 1), "player", "Space should execute legal move from selected piece")
   assert_equal(game.state.current_player, "enemy", "After player move it should become enemy turn")
+end
+
+function Tests.playing_arrow_hold_repeats_cursor_movement()
+  local game = Game.new()
+  game:start_game(7, "hard")
+  local previous_love = love
+
+  local ok, err = pcall(function()
+    love = {
+      keyboard = {
+        isDown = function(key)
+          return key == "right"
+        end,
+      },
+    }
+
+    game:keypressed("right")
+    assert_equal(game.cursor_cell.x, 2, "Initial right press should move cursor one step")
+
+    game:update(0.40)
+    assert_truthy(game.cursor_cell.x > 2, "Held arrow key should continue moving cursor across cells")
+  end)
+
+  love = previous_love
+
+  if not ok then
+    error(err, 2)
+  end
 end
 
 function Tests.start_game_adds_piece_spawn_animations()

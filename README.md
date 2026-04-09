@@ -1,6 +1,6 @@
-# Bacteria Prototype
+# Sporeline
 
-A small LÖVE 2D prototype inspired by the bacteria puzzle from *The 7th Guest*.
+A small LÖVE 2D strategy game inspired by the bacteria puzzle from *The 7th Guest*.
 
 ## Requirements
 
@@ -37,7 +37,7 @@ Create distributable output:
 make build
 ```
 
-This creates `dist/bacteria.love` and, on macOS, a standalone app bundle at `dist/Bacteria.app`.
+This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `dist/Sporeline.app`.
 
 ## Controls
 
@@ -48,6 +48,7 @@ This creates `dist/bacteria.love` and, on macOS, a standalone app bundle at `dis
 - Left click one of your bacteria to select it.
 - Left click a highlighted cell to move.
 - In game keyboard: `Arrow keys` move the cursor, `Enter`/`Space` select and move.
+- `F` or `F11` toggles fullscreen.
 - `R` restarts the board.
 - `Esc` returns to the main menu.
 - `Esc` on the main menu quits.
@@ -72,6 +73,7 @@ This creates `dist/bacteria.love` and, on macOS, a standalone app bundle at `dis
 - `src/ai.lua` contains enemy move selection logic for easy/medium/hard difficulties.
 - `src/render.lua` draws the board, HUD, highlights, and end-game overlay.
 - `src/input.lua` handles simple mouse and keyboard helpers.
+- `src/audio.lua` provides lightweight generated sound effects.
 - `src/level.lua` defines the starting layout for the chosen board size.
 - `src/game.lua` coordinates turn flow and AI timing.
 - `assets/fonts/` contains bundled UI fonts used for title/body typography.

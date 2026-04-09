@@ -1,7 +1,7 @@
 .PHONY: test run love build clean
 
-APP_NAME := Bacteria
-APP_SLUG := bacteria
+APP_NAME := Sporeline
+APP_SLUG := sporeline
 DIST_DIR := dist
 LOVE_ARCHIVE := $(DIST_DIR)/$(APP_SLUG).love
 APP_BUNDLE := $(DIST_DIR)/$(APP_NAME).app

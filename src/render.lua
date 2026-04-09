@@ -188,29 +188,38 @@ local function draw_button(button, active, focused, hovered, pulse_time, y_offse
   )
 end
 
-local function build_move_lookup(state)
+local function build_move_lookup(state, preview_cell)
   local lookup = {}
+  local source_cell = nil
 
-  if state.winner or state.current_player ~= "player" or not state.selected_cell then
-    return lookup
+  if state.winner or state.current_player ~= "player" then
+    return lookup, source_cell
   end
 
-  if board.get_cell(state, state.selected_cell.x, state.selected_cell.y) ~= "player" then
-    return lookup
+  if state.selected_cell then
+    source_cell = state.selected_cell
+  elseif preview_cell then
+    source_cell = preview_cell
+  else
+    return lookup, source_cell
+  end
+
+  if board.get_cell(state, source_cell.x, source_cell.y) ~= "player" then
+    return lookup, nil
   end
 
   local moves = rules.get_piece_moves(
     state,
     "player",
-    state.selected_cell.x,
-    state.selected_cell.y
+    source_cell.x,
+    source_cell.y
   )
 
   for _, move in ipairs(moves) do
     lookup[cell_key(move.to.x, move.to.y)] = move.kind
   end
 
-  return lookup
+  return lookup, source_cell
 end
 
 local function cell_rect(layout, x, y)
@@ -220,9 +229,10 @@ local function cell_rect(layout, x, y)
   return px, py, layout.cell_size, layout.cell_size
 end
 
-local function draw_piece(px, py, size, side, animation, alpha_multiplier)
+local function draw_piece(px, py, size, side, animation, alpha_multiplier, lift_amount)
   local base = palette.player
   local core = palette.player_core
+  local lift = clamp(lift_amount or 0, 0, 1)
 
   if side == "enemy" then
     base = palette.enemy
@@ -245,10 +255,11 @@ local function draw_piece(px, py, size, side, animation, alpha_multiplier)
     end
   end
 
+  scale = scale * (1 + (lift * 0.12))
   alpha = alpha * (alpha_multiplier or 1.0)
 
   local cx = px + size * 0.5
-  local cy = py + size * 0.5
+  local cy = (py + size * 0.5) - (size * 0.16 * lift)
   local radius = size * 0.32 * scale
 
   if animation and animation.kind == "convert" and animation_progress < 1 then
@@ -256,14 +267,39 @@ local function draw_piece(px, py, size, side, animation, alpha_multiplier)
     love.graphics.circle("fill", cx, cy, (size * 0.34) + (size * 0.20 * animation_progress))
   end
 
-  love.graphics.setColor(0, 0, 0, 0.18 * alpha)
-  love.graphics.circle("fill", cx + 2, cy + 4, radius)
+  local shadow_radius = radius * (1 + (lift * 0.12))
+  local shadow_alpha = (0.18 * alpha) * (1 - (lift * 0.50))
+  love.graphics.setColor(0, 0, 0, shadow_alpha)
+  love.graphics.circle("fill", cx + 2, cy + 4 + (size * 0.07 * lift), shadow_radius)
 
   set_color(base, alpha)
   love.graphics.circle("fill", cx, cy, radius)
 
   set_color(core, alpha)
   love.graphics.circle("fill", cx - radius * 0.22, cy - radius * 0.22, radius * 0.44)
+end
+
+local function mouse_to_cell(layout)
+  if not love or not love.mouse or not love.mouse.getPosition then
+    return nil
+  end
+
+  local x, y = love.mouse.getPosition()
+  local local_x = x - layout.origin_x
+  local local_y = y - layout.origin_y
+
+  if local_x < 0 or local_y < 0 then
+    return nil
+  end
+
+  if local_x >= layout.board_width or local_y >= layout.board_height then
+    return nil
+  end
+
+  return {
+    x = math.floor(local_x / layout.cell_size) + 1,
+    y = math.floor(local_y / layout.cell_size) + 1,
+  }
 end
 
 local function draw_progress_bar(state, layout, alpha_multiplier)
@@ -484,7 +520,7 @@ function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time)
 
   love.graphics.setFont(fonts.title)
   set_color(palette.text, transition)
-  love.graphics.printf("Bacteria", ui.panel.x, ui.panel.y + 34, ui.panel.width, "center")
+  love.graphics.printf("Sporeline", ui.panel.x, ui.panel.y + 34, ui.panel.width, "center")
 
   for _, button in ipairs(ui.buttons) do
     draw_button(
@@ -593,11 +629,13 @@ end
 function Render.draw(state, view)
   local width, height = love.graphics.getDimensions()
   local layout = Render.get_layout(width, height, state)
-  local move_lookup = build_move_lookup(state)
   local cursor_cell = nil
   local piece_animations = nil
   local transition = 1
   local ui_time = 0
+  local hovered_cell = nil
+  local preview_cell = nil
+  local move_source = nil
 
   if view and view.cursor_cell then
     cursor_cell = view.cursor_cell
@@ -614,6 +652,18 @@ function Render.draw(state, view)
   if view and view.ui_time ~= nil then
     ui_time = view.ui_time
   end
+
+  hovered_cell = mouse_to_cell(layout)
+  if hovered_cell
+    and not state.selected_cell
+    and not state.winner
+    and state.current_player == "player"
+    and board.get_cell(state, hovered_cell.x, hovered_cell.y) == "player" then
+    preview_cell = hovered_cell
+  end
+
+  local move_lookup
+  move_lookup, move_source = build_move_lookup(state, preview_cell)
 
   local highlight_pulse = (math.sin(ui_time * 5.4) + 1) * 0.5
 
@@ -667,10 +717,30 @@ function Render.draw(state, view)
       local is_selected = state.selected_cell and board.same_cell(state.selected_cell, { x = x, y = y })
       local is_last_move = state.last_move and board.same_cell(state.last_move.to, { x = x, y = y })
       local is_cursor = cursor_cell and cursor_cell.x == x and cursor_cell.y == y
+      local is_preview_source = preview_cell and preview_cell.x == x and preview_cell.y == y
+      local is_move_source = move_source and move_source.x == x and move_source.y == y
+      local can_hover_lift = not state.winner and state.current_player == "player" and occupant == "player"
+      local is_hovered_piece = can_hover_lift
+        and hovered_cell
+        and hovered_cell.x == x
+        and hovered_cell.y == y
+      local is_keyboard_hovered_piece = can_hover_lift and is_cursor and not state.selected_cell
       local piece_animation = nil
+      local piece_lift = 0
 
       if piece_animations then
         piece_animation = piece_animations[cell_key(x, y)]
+      end
+
+      if is_preview_source and is_move_source then
+        local pickup_pulse = (math.sin((ui_time * 7.4) + ((x + y) * 0.35)) + 1) * 0.5
+        piece_lift = 0.58 + (pickup_pulse * 0.12)
+      elseif is_selected then
+        local selected_pulse = (math.sin((ui_time * 6.2) + ((x + y) * 0.28)) + 1) * 0.5
+        piece_lift = 0.52 + (selected_pulse * 0.10)
+      elseif is_hovered_piece or is_keyboard_hovered_piece then
+        local hover_pulse = (math.sin((ui_time * 6.8) + ((x + y) * 0.25)) + 1) * 0.5
+        piece_lift = 0.42 + (hover_pulse * 0.12)
       end
 
       set_color(palette.cell, transition)
@@ -680,17 +750,27 @@ function Render.draw(state, view)
       love.graphics.rectangle("line", px + 3, py + 3, size - 6, size - 6, 16, 16)
 
       if move_kind == "grow" then
+        local phase = ((x * 13) + (y * 7)) * 0.15
+        local bob = math.sin((ui_time * 4.8) + phase) * 1.3
+        local breathe = math.sin((ui_time * 3.6) + phase) * 0.7
+        local inset = 8 - (breathe * 0.45)
+        local rect_size = size - (inset * 2)
         local move_alpha = 0.72 + (highlight_pulse * 0.28)
         set_color(palette.grow, transition * move_alpha)
-        love.graphics.rectangle("fill", px + 8, py + 8, size - 16, size - 16, 14, 14)
+        love.graphics.rectangle("fill", px + inset, py + inset + bob, rect_size, rect_size, 14, 14)
         set_color(palette.grow_edge, transition * (0.80 + (highlight_pulse * 0.20)))
-        love.graphics.rectangle("line", px + 8, py + 8, size - 16, size - 16, 14, 14)
+        love.graphics.rectangle("line", px + inset, py + inset + bob, rect_size, rect_size, 14, 14)
       elseif move_kind == "jump" then
+        local phase = ((x * 11) + (y * 5)) * 0.17
+        local bob = math.sin((ui_time * 4.5) + phase) * 1.2
+        local breathe = math.sin((ui_time * 3.1) + phase) * 0.65
+        local inset = 8 - (breathe * 0.40)
+        local rect_size = size - (inset * 2)
         local move_alpha = 0.72 + (highlight_pulse * 0.28)
         set_color(palette.jump, transition * move_alpha)
-        love.graphics.rectangle("fill", px + 8, py + 8, size - 16, size - 16, 14, 14)
+        love.graphics.rectangle("fill", px + inset, py + inset + bob, rect_size, rect_size, 14, 14)
         set_color(palette.jump_edge, transition * (0.80 + (highlight_pulse * 0.20)))
-        love.graphics.rectangle("line", px + 8, py + 8, size - 16, size - 16, 14, 14)
+        love.graphics.rectangle("line", px + inset, py + inset + bob, rect_size, rect_size, 14, 14)
       end
 
       if is_selected then
@@ -708,7 +788,7 @@ function Render.draw(state, view)
       end
 
       if occupant ~= "empty" then
-        draw_piece(px, py, size, occupant, piece_animation, transition)
+        draw_piece(px, py, size, occupant, piece_animation, transition, piece_lift)
       end
     end
   end
