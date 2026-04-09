@@ -233,6 +233,99 @@ local function draw_audio_status_badge(width, height, audio_status, alpha_multip
   love.graphics.print(label, x + 13, y + math.floor((box_height - text_height) * 0.5))
 end
 
+local function settings_label_for(control_id, audio_status)
+  if control_id == "fullscreen" then
+    if audio_status and audio_status.fullscreen then
+      return "Windowed"
+    end
+    return "Fullscreen"
+  end
+
+  if control_id == "mute" then
+    if audio_status and audio_status.muted then
+      return "Unmute"
+    end
+    return "Mute"
+  end
+
+  if control_id == "sfx_down" then
+    return "SFX -"
+  end
+
+  if control_id == "sfx_up" then
+    return "SFX +"
+  end
+
+  if control_id == "music_down" then
+    return "Music -"
+  end
+
+  if control_id == "music_up" then
+    return "Music +"
+  end
+
+  return "Setting"
+end
+
+local function draw_menu_settings_row(controls, width, audio_status, transition, pulse_time)
+  if not controls then
+    return
+  end
+
+  local hovered_id = get_hovered_button_id(controls)
+  local sfx_volume = 0
+  local music_volume = 0
+
+  if audio_status then
+    sfx_volume = clamp(audio_status.sfx_volume or 0, 0, 1)
+    music_volume = clamp(audio_status.music_volume or 0, 0, 1)
+  end
+
+  love.graphics.setFont(fonts.small)
+  set_color(palette.text_muted, transition)
+  love.graphics.printf(
+    ("Settings  |  SFX %d%%  |  Music %d%%"):format(
+      math.floor((sfx_volume * 100) + 0.5),
+      math.floor((music_volume * 100) + 0.5)
+    ),
+    0,
+    controls[1].y - fonts.small:getHeight() - 6,
+    width,
+    "center"
+  )
+
+  for _, control in ipairs(controls) do
+    draw_button(
+      {
+        id = control.id,
+        label = settings_label_for(control.id, audio_status),
+        x = control.x,
+        y = control.y,
+        width = control.width,
+        height = control.height,
+      },
+      false,
+      false,
+      control.id == hovered_id,
+      pulse_time,
+      0,
+      transition
+    )
+  end
+end
+
+local function draw_settings_toggle_hint(width, height, settings_visible, transition)
+  love.graphics.setFont(fonts.small)
+  set_color(palette.text_muted, transition * 0.92)
+
+  local message = "Tab: Show Settings"
+  if settings_visible then
+    message = "Tab: Hide Settings"
+  end
+
+  love.graphics.printf(message, 0, height - 20, width, "center")
+end
+
 local function build_move_lookup(state, preview_cell)
   local lookup = {}
   local source_cell = nil
@@ -634,6 +727,7 @@ function Render.get_main_menu_ui(width, height)
   local panel_height = 272
   local panel_x = math.floor((width - panel_width) * 0.5)
   local panel_y = math.floor((height - panel_height) * 0.5)
+  local button_offset_y = 24
 
   return {
     panel = {
@@ -642,12 +736,20 @@ function Render.get_main_menu_ui(width, height)
       width = panel_width,
       height = panel_height,
     },
+    settings_controls = {
+      { id = "fullscreen", x = math.floor((width - 640) * 0.5), y = height - 62, width = 130, height = 42 },
+      { id = "mute", x = math.floor((width - 640) * 0.5) + 140, y = height - 62, width = 100, height = 42 },
+      { id = "sfx_down", x = math.floor((width - 640) * 0.5) + 250, y = height - 62, width = 84, height = 42 },
+      { id = "sfx_up", x = math.floor((width - 640) * 0.5) + 344, y = height - 62, width = 84, height = 42 },
+      { id = "music_down", x = math.floor((width - 640) * 0.5) + 438, y = height - 62, width = 96, height = 42 },
+      { id = "music_up", x = math.floor((width - 640) * 0.5) + 544, y = height - 62, width = 96, height = 42 },
+    },
     buttons = {
       {
         id = "play",
         label = "Play",
         x = panel_x + 70,
-        y = panel_y + 94,
+        y = panel_y + 94 + button_offset_y,
         width = panel_width - 140,
         height = 50,
       },
@@ -655,7 +757,7 @@ function Render.get_main_menu_ui(width, height)
         id = "quit",
         label = "Quit",
         x = panel_x + 70,
-        y = panel_y + 158,
+        y = panel_y + 158 + button_offset_y,
         width = panel_width - 140,
         height = 50,
       },
@@ -681,6 +783,14 @@ function Render.get_play_menu_ui(width, height)
       y = panel_y,
       width = panel_width,
       height = panel_height,
+    },
+    settings_controls = {
+      { id = "fullscreen", x = math.floor((width - 640) * 0.5), y = height - 62, width = 130, height = 42 },
+      { id = "mute", x = math.floor((width - 640) * 0.5) + 140, y = height - 62, width = 100, height = 42 },
+      { id = "sfx_down", x = math.floor((width - 640) * 0.5) + 250, y = height - 62, width = 84, height = 42 },
+      { id = "sfx_up", x = math.floor((width - 640) * 0.5) + 344, y = height - 62, width = 84, height = 42 },
+      { id = "music_down", x = math.floor((width - 640) * 0.5) + 438, y = height - 62, width = 96, height = 42 },
+      { id = "music_up", x = math.floor((width - 640) * 0.5) + 544, y = height - 62, width = 96, height = 42 },
     },
     buttons = {
       {
@@ -791,11 +901,11 @@ local function draw_overlay(state, width, height)
   ), panel_x, panel_y + 96, panel_width, "center")
 end
 
-function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time, audio_status)
+function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time, audio_status, settings_visible)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_main_menu_ui(width, height)
   local transition = clamp(menu_transition or 1, 0, 1)
-  local y_offset = 0
+  local y_offset = math.floor((1 - transition) * 18)
   local hovered_id = get_hovered_button_id(ui.buttons)
 
   refresh_fonts_for_size(width, height)
@@ -804,7 +914,7 @@ function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time, a
 
   love.graphics.setFont(fonts.title)
   set_color(palette.text, transition)
-  love.graphics.printf("Sporeline", ui.panel.x, ui.panel.y + 34, ui.panel.width, "center")
+  love.graphics.printf("Sporeline", ui.panel.x, ui.panel.y + 34 + y_offset, ui.panel.width, "center")
   draw_audio_status_badge(width, height, audio_status, transition, 18)
 
   for _, button in ipairs(ui.buttons) do
@@ -819,17 +929,22 @@ function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time, a
     )
   end
 
+  draw_settings_toggle_hint(width, height, settings_visible, transition)
+  if settings_visible then
+    draw_menu_settings_row(ui.settings_controls, width, audio_status, transition, pulse_time)
+  end
+
   if transition < 1 then
     love.graphics.setColor(0.01, 0.02, 0.03, (1 - transition) * 0.35)
     love.graphics.rectangle("fill", 0, 0, width, height)
   end
 end
 
-function Render.draw_play_menu(selected_size, selected_difficulty, focused_button_id, menu_transition, pulse_time, audio_status)
+function Render.draw_play_menu(selected_size, selected_difficulty, focused_button_id, menu_transition, pulse_time, audio_status, settings_visible)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_play_menu_ui(width, height)
   local transition = clamp(menu_transition or 1, 0, 1)
-  local y_offset = 0
+  local y_offset = math.floor((1 - transition) * 18)
   local hovered_id = get_hovered_button_id(ui.buttons)
 
   refresh_fonts_for_size(width, height)
@@ -838,13 +953,13 @@ function Render.draw_play_menu(selected_size, selected_difficulty, focused_butto
 
   love.graphics.setFont(fonts.title)
   set_color(palette.text, transition)
-  love.graphics.printf("Play", ui.panel.x, ui.panel.y + 30, ui.panel.width, "center")
+  love.graphics.printf("Play", ui.panel.x, ui.panel.y + 30 + y_offset, ui.panel.width, "center")
   draw_audio_status_badge(width, height, audio_status, transition, 18)
 
   love.graphics.setFont(fonts.section)
   set_color(palette.text_muted, transition)
-  love.graphics.printf("Board Size", ui.panel.x, ui.panel.y + 88, ui.panel.width, "center")
-  love.graphics.printf("Bot Difficulty", ui.panel.x, ui.panel.y + 218, ui.panel.width, "center")
+  love.graphics.printf("Board Size", ui.panel.x, ui.panel.y + 88 + y_offset, ui.panel.width, "center")
+  love.graphics.printf("Bot Difficulty", ui.panel.x, ui.panel.y + 218 + y_offset, ui.panel.width, "center")
 
   for _, button in ipairs(ui.buttons) do
     local active = false
@@ -872,6 +987,11 @@ function Render.draw_play_menu(selected_size, selected_difficulty, focused_butto
       y_offset,
       transition
     )
+  end
+
+  draw_settings_toggle_hint(width, height, settings_visible, transition)
+  if settings_visible then
+    draw_menu_settings_row(ui.settings_controls, width, audio_status, transition, pulse_time)
   end
 
   if transition < 1 then
@@ -923,7 +1043,14 @@ function Render.draw(state, view)
   local preview_cell = nil
   local move_source = nil
   local move_animation = nil
+  local shake_offset = nil
   local audio_status = nil
+  local opening_scene = nil
+  local opening_active = false
+  local opening_progress = 1
+  local opening_eased = 1
+  local board_transition = 1
+  local board_y_offset = 0
 
   if view and view.cursor_cell then
     cursor_cell = view.cursor_cell
@@ -949,7 +1076,30 @@ function Render.draw(state, view)
     move_animation = view.move_animation
   end
 
+  if view and view.shake_offset then
+    shake_offset = view.shake_offset
+  end
+
+  if view and view.opening_scene then
+    opening_scene = view.opening_scene
+  end
+
+  if opening_scene and opening_scene.active == true then
+    opening_active = true
+    opening_progress = clamp(opening_scene.progress or 0, 0, 1)
+    opening_eased = smoothstep(opening_progress)
+    board_transition = transition * (0.14 + (opening_eased * 0.86))
+    board_y_offset = math.floor((1 - opening_eased) * 22)
+    cursor_cell = nil
+  else
+    board_transition = transition
+  end
+
   hovered_cell = mouse_to_cell(layout)
+  if opening_active then
+    hovered_cell = nil
+  end
+
   if hovered_cell
     and not state.selected_cell
     and not state.winner
@@ -962,17 +1112,27 @@ function Render.draw(state, view)
   move_lookup, move_source = build_move_lookup(state, preview_cell)
 
   local highlight_pulse = (math.sin(ui_time * 5.4) + 1) * 0.5
+  local shake_x = 0
+  local shake_y = 0
 
   refresh_fonts_for_size(width, height)
   draw_background(width, height)
-  draw_progress_bar(state, layout, transition)
   draw_audio_status_badge(width, height, audio_status, transition, height - 46)
+
+  if shake_offset then
+    shake_x = shake_offset.x or 0
+    shake_y = shake_offset.y or 0
+  end
+
+  love.graphics.push()
+  love.graphics.translate(shake_x, shake_y + board_y_offset)
+  draw_progress_bar(state, layout, board_transition)
 
   love.graphics.setColor(
     palette.board_shadow[1],
     palette.board_shadow[2],
     palette.board_shadow[3],
-    palette.board_shadow[4] * transition
+    palette.board_shadow[4] * board_transition
   )
   love.graphics.rectangle(
     "fill",
@@ -984,7 +1144,7 @@ function Render.draw(state, view)
     24
   )
 
-  set_color(palette.panel, transition)
+  set_color(palette.panel, board_transition)
   love.graphics.rectangle(
     "fill",
     layout.origin_x - 18,
@@ -994,7 +1154,7 @@ function Render.draw(state, view)
     28,
     28
   )
-  set_color(palette.panel_edge, transition)
+  set_color(palette.panel_edge, board_transition)
   love.graphics.setLineWidth(2)
   love.graphics.rectangle(
     "line",
@@ -1024,6 +1184,24 @@ function Render.draw(state, view)
       local is_keyboard_hovered_piece = can_hover_lift and is_cursor and not state.selected_cell
       local piece_animation = nil
       local piece_lift = 0
+      local cell_transition = board_transition
+
+      if opening_active then
+        local cell_index = ((y - 1) * state.width) + (x - 1)
+        local cell_count = math.max(1, (state.width * state.height) - 1)
+        local reveal_order = cell_index / cell_count
+        local reveal_start = reveal_order * 0.40
+        local reveal_span = math.max(0.22, 1 - reveal_start)
+        local reveal = smoothstep((opening_progress - reveal_start) / reveal_span)
+        cell_transition = board_transition * reveal
+        is_selected = false
+        is_last_move = false
+        is_cursor = false
+        is_preview_source = false
+        is_move_source = false
+        is_hovered_piece = false
+        is_keyboard_hovered_piece = false
+      end
 
       if piece_animations then
         piece_animation = piece_animations[cell_key(x, y)]
@@ -1040,9 +1218,9 @@ function Render.draw(state, view)
         piece_lift = 0.42 + (hover_pulse * 0.12)
       end
 
-      set_color(palette.cell, transition)
+      set_color(palette.cell, cell_transition)
       love.graphics.rectangle("fill", px + 3, py + 3, size - 6, size - 6, 16, 16)
-      set_color(palette.cell_edge, transition)
+      set_color(palette.cell_edge, cell_transition)
       love.graphics.setLineWidth(1)
       love.graphics.rectangle("line", px + 3, py + 3, size - 6, size - 6, 16, 16)
 
@@ -1053,9 +1231,9 @@ function Render.draw(state, view)
         local inset = 8 - (breathe * 0.45)
         local rect_size = size - (inset * 2)
         local move_alpha = 0.72 + (highlight_pulse * 0.28)
-        set_color(palette.grow, transition * move_alpha)
+        set_color(palette.grow, cell_transition * move_alpha)
         love.graphics.rectangle("fill", px + inset, py + inset + bob, rect_size, rect_size, 14, 14)
-        set_color(palette.grow_edge, transition * (0.80 + (highlight_pulse * 0.20)))
+        set_color(palette.grow_edge, cell_transition * (0.80 + (highlight_pulse * 0.20)))
         love.graphics.rectangle("line", px + inset, py + inset + bob, rect_size, rect_size, 14, 14)
       elseif move_kind == "jump" then
         local phase = ((x * 11) + (y * 5)) * 0.17
@@ -1064,33 +1242,42 @@ function Render.draw(state, view)
         local inset = 8 - (breathe * 0.40)
         local rect_size = size - (inset * 2)
         local move_alpha = 0.72 + (highlight_pulse * 0.28)
-        set_color(palette.jump, transition * move_alpha)
+        set_color(palette.jump, cell_transition * move_alpha)
         love.graphics.rectangle("fill", px + inset, py + inset + bob, rect_size, rect_size, 14, 14)
-        set_color(palette.jump_edge, transition * (0.80 + (highlight_pulse * 0.20)))
+        set_color(palette.jump_edge, cell_transition * (0.80 + (highlight_pulse * 0.20)))
         love.graphics.rectangle("line", px + inset, py + inset + bob, rect_size, rect_size, 14, 14)
       end
 
       if is_selected then
-        set_color(palette.selected, transition * (0.84 + (highlight_pulse * 0.16)))
+        set_color(palette.selected, cell_transition * (0.84 + (highlight_pulse * 0.16)))
         love.graphics.setLineWidth(2 + (highlight_pulse * 2))
         love.graphics.rectangle("line", px + 5, py + 5, size - 10, size - 10, 16, 16)
       elseif is_cursor and not state.winner then
-        set_color(palette.text_muted, transition * (0.75 + (highlight_pulse * 0.25)))
+        set_color(palette.text_muted, cell_transition * (0.75 + (highlight_pulse * 0.25)))
         love.graphics.setLineWidth(1.5 + (highlight_pulse * 1.2))
         love.graphics.rectangle("line", px + 10, py + 10, size - 20, size - 20, 14, 14)
       elseif is_last_move then
-        set_color(palette.text_muted, transition * (0.68 + (highlight_pulse * 0.20)))
+        set_color(palette.text_muted, cell_transition * (0.68 + (highlight_pulse * 0.20)))
         love.graphics.setLineWidth(1.6 + (highlight_pulse * 1.0))
         love.graphics.rectangle("line", px + 7, py + 7, size - 14, size - 14, 16, 16)
       end
 
       if occupant ~= "empty" then
-        draw_piece(px, py, size, occupant, piece_animation, transition, piece_lift)
+        draw_piece(px, py, size, occupant, piece_animation, cell_transition, piece_lift)
       end
     end
   end
 
-  draw_move_animation(layout, move_animation, transition)
+  draw_move_animation(layout, move_animation, board_transition)
+  love.graphics.pop()
+
+  if opening_active then
+    local veil = (1 - opening_eased) * 0.28
+    if veil > 0.001 then
+      love.graphics.setColor(0.01, 0.02, 0.03, veil)
+      love.graphics.rectangle("fill", 0, 0, width, height)
+    end
+  end
 
   if transition < 1 and not state.winner then
     love.graphics.setColor(0.01, 0.02, 0.03, (1 - transition) * 0.42)

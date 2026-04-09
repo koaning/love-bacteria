@@ -45,6 +45,8 @@ This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `di
 - Menu keyboard: `Arrow keys` move focus logically, `Enter`/`Space` activates focused button.
 - Main menu keyboard: `P` opens Play, `Esc` quits.
 - Play menu keyboard: `5`/`7`/`9` choose board size, `E`/`M`/`H` choose bot difficulty, `Esc` goes back.
+- `Tab` shows/hides the menu settings row.
+- Menus include a settings row for `Fullscreen`, `Mute`, and `SFX/Music` volume (`+/-`) via mouse click.
 - Left click one of your bacteria to select it.
 - Left click a highlighted cell to move.
 - In game keyboard: `Arrow keys` move the cursor, `Enter`/`Space` select and move.

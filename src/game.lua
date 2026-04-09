@@ -16,6 +16,10 @@ local PIECE_CONVERT_DURATION = 0.24
 local MOVE_GROW_DURATION = 0.34
 local MOVE_JUMP_DURATION = 0.30
 local BIG_CAPTURE_THRESHOLD = 3
+local BIG_CAPTURE_SHAKE_DURATION = 0.22
+local OPENING_SCENE_DURATION = 0.82
+local OPENING_SCENE_MUSIC_DELAY = 0.60
+local SETTINGS_VOLUME_STEP = 0.05
 local CURSOR_REPEAT_DELAY = 0.22
 local CURSOR_REPEAT_INTERVAL = 0.07
 
@@ -142,6 +146,14 @@ function Game.new()
   self.visual_time = 0
   self.piece_animations = {}
   self.move_animation = nil
+  self.opening_scene = nil
+  self.screen_shake = {
+    x = 0,
+    y = 0,
+    elapsed = 0,
+    duration = 0,
+    amplitude = 0,
+  }
   self.cursor_repeat = {
     up = { held = false, elapsed = 0 },
     down = { held = false, elapsed = 0 },
@@ -149,6 +161,7 @@ function Game.new()
     right = { held = false, elapsed = 0 },
   }
   self.menu_focus_index = nil
+  self.settings_visible = false
   self.screen = nil
   self:set_screen("main_menu")
 
@@ -207,15 +220,21 @@ end
 function Game:start_game(board_size, bot_difficulty)
   local size = board_size or self.selected_board_size or 7
   local difficulty = bot_difficulty or self.selected_bot_difficulty or "hard"
+  local with_intro = self.screen == "main_menu" or self.screen == "play_menu"
   self.selected_board_size = size
   self.selected_bot_difficulty = difficulty
   self.board_size = size
   self.bot_difficulty = difficulty
   local next_state = rules.resolve_state(level.load(size))
   self:set_state(next_state, false)
-  self:set_screen("playing")
+  self:set_screen("playing", { with_intro = with_intro })
   self.ai_timer = 0
   self.move_animation = nil
+  self.screen_shake.x = 0
+  self.screen_shake.y = 0
+  self.screen_shake.elapsed = 0
+  self.screen_shake.duration = 0
+  self.screen_shake.amplitude = 0
   self.cursor_cell = find_first_player_cell(self.state)
 end
 
@@ -228,6 +247,11 @@ function Game:restart()
   self:set_state(next_state, false)
   self.ai_timer = 0
   self.move_animation = nil
+  self.screen_shake.x = 0
+  self.screen_shake.y = 0
+  self.screen_shake.elapsed = 0
+  self.screen_shake.duration = 0
+  self.screen_shake.amplitude = 0
   self.cursor_cell = find_first_player_cell(self.state)
 end
 
@@ -253,6 +277,26 @@ function Game:start_move_animation(side, last_move)
   }
 end
 
+function Game:trigger_screen_shake(amplitude, duration)
+  local next_amplitude = amplitude or 0
+
+  if next_amplitude <= 0 then
+    return
+  end
+
+  local next_duration = duration or BIG_CAPTURE_SHAKE_DURATION
+
+  if self.screen_shake.amplitude < next_amplitude then
+    self.screen_shake.amplitude = next_amplitude
+  end
+
+  if self.screen_shake.duration < next_duration then
+    self.screen_shake.duration = next_duration
+  end
+
+  self.screen_shake.elapsed = 0
+end
+
 function Game:commit_move(move)
   local moving_side = self.state and self.state.current_player
   local next_state = rules.resolve_state(rules.apply_move(self.state, move))
@@ -276,6 +320,8 @@ function Game:commit_move(move)
 
   if converted >= BIG_CAPTURE_THRESHOLD then
     self.audio:play("big_capture")
+    local shake_intensity = 2.3 + math.min(3.8, converted * 0.85)
+    self:trigger_screen_shake(shake_intensity, BIG_CAPTURE_SHAKE_DURATION + (converted * 0.015))
   end
 
   self:start_move_animation(moving_side, self.state and self.state.last_move)
@@ -316,6 +362,56 @@ function Game:update_move_animation(dt)
   if progress >= 1 then
     self.move_animation = nil
   end
+end
+
+function Game:update_screen_shake(dt)
+  if not self.screen_shake then
+    return
+  end
+
+  local duration = self.screen_shake.duration or 0
+  local amplitude = self.screen_shake.amplitude or 0
+
+  if duration <= 0 or amplitude <= 0 then
+    self.screen_shake.x = 0
+    self.screen_shake.y = 0
+    return
+  end
+
+  local delta = dt or 0
+  self.screen_shake.elapsed = self.screen_shake.elapsed + delta
+  local progress = self.screen_shake.elapsed / duration
+
+  if progress >= 1 then
+    self.screen_shake.elapsed = 0
+    self.screen_shake.duration = 0
+    self.screen_shake.amplitude = 0
+    self.screen_shake.x = 0
+    self.screen_shake.y = 0
+    return
+  end
+
+  local decay = (1 - progress) * (1 - progress)
+  local live_amplitude = amplitude * decay
+  local rand = math.random
+
+  if love and love.math and love.math.random then
+    rand = love.math.random
+  end
+
+  self.screen_shake.x = ((rand() * 2) - 1) * live_amplitude
+  self.screen_shake.y = ((rand() * 2) - 1) * live_amplitude
+end
+
+function Game:get_screen_shake_offset()
+  if not self.screen_shake then
+    return { x = 0, y = 0 }
+  end
+
+  return {
+    x = self.screen_shake.x or 0,
+    y = self.screen_shake.y or 0,
+  }
 end
 
 function Game:update_cursor_repeat(delta)
@@ -387,6 +483,16 @@ function Game:get_menu_buttons(screen)
   return ui.buttons
 end
 
+function Game:get_menu_settings_controls(screen)
+  local ui = self:get_menu_ui(screen)
+
+  if not ui then
+    return nil
+  end
+
+  return ui.settings_controls
+end
+
 function Game:default_menu_focus_index(screen)
   local target_screen = screen or self.screen
   local buttons = self:get_menu_buttons(target_screen)
@@ -402,7 +508,70 @@ function Game:default_menu_focus_index(screen)
   return find_button_index(buttons, "play") or 1
 end
 
-function Game:set_screen(screen)
+function Game:start_opening_scene()
+  self.opening_scene = {
+    active = true,
+    elapsed = 0,
+    duration = OPENING_SCENE_DURATION,
+    music_delay = OPENING_SCENE_MUSIC_DELAY,
+    music_started = false,
+  }
+
+  if self.audio and self.audio.set_target_music then
+    self.audio:set_target_music(nil)
+    return
+  end
+
+  self.audio:set_context("game")
+  self.opening_scene.music_started = true
+end
+
+function Game:clear_opening_scene()
+  self.opening_scene = nil
+end
+
+function Game:update_opening_scene(dt)
+  local scene = self.opening_scene
+
+  if not scene or not scene.active then
+    return
+  end
+
+  scene.elapsed = scene.elapsed + (dt or 0)
+
+  if not scene.music_started and scene.elapsed >= (scene.music_delay or OPENING_SCENE_MUSIC_DELAY) then
+    self.audio:set_context("game")
+    scene.music_started = true
+  end
+
+  if scene.elapsed >= (scene.duration or OPENING_SCENE_DURATION) then
+    scene.active = false
+    scene.elapsed = scene.duration or OPENING_SCENE_DURATION
+
+    if not scene.music_started then
+      self.audio:set_context("game")
+      scene.music_started = true
+    end
+  end
+end
+
+function Game:get_opening_scene_view()
+  local scene = self.opening_scene
+
+  if not scene then
+    return nil
+  end
+
+  local duration = math.max(scene.duration or OPENING_SCENE_DURATION, 0.0001)
+
+  return {
+    active = scene.active == true,
+    progress = math.min(1, math.max(0, (scene.elapsed or 0) / duration)),
+  }
+end
+
+function Game:set_screen(screen, options)
+  local opts = options or {}
   self.screen = screen
 
   if screen == "playing" then
@@ -410,13 +579,26 @@ function Game:set_screen(screen)
     self.menu_transition = 1
     self.play_transition = 0
     self:reset_cursor_repeat()
-    self.audio:set_context("game")
+
+    if opts.with_intro then
+      self:start_opening_scene()
+    else
+      self:clear_opening_scene()
+      self.audio:set_context("game")
+    end
+
     return
   end
 
+  self:clear_opening_scene()
   self.play_transition = 1
   self.menu_transition = 0
   self.menu_pulse_time = 0
+  self.screen_shake.x = 0
+  self.screen_shake.y = 0
+  self.screen_shake.elapsed = 0
+  self.screen_shake.duration = 0
+  self.screen_shake.amplitude = 0
   self:reset_cursor_repeat()
   self.menu_focus_index = self:default_menu_focus_index(screen)
   self.audio:set_context("menu")
@@ -435,6 +617,14 @@ function Game:toggle_fullscreen()
   end
 end
 
+function Game:is_fullscreen()
+  if not love or not love.window or not love.window.getFullscreen then
+    return false
+  end
+
+  return love.window.getFullscreen()
+end
+
 function Game:can_toggle_mute()
   if self.screen ~= "play_menu" then
     return true
@@ -451,6 +641,78 @@ function Game:toggle_mute()
   end
 end
 
+function Game:adjust_sfx_volume(delta)
+  local current_volume = self.audio:get_sfx_volume()
+  local next_volume = self.audio:adjust_sfx_volume(delta)
+
+  if math.abs(next_volume - current_volume) > 0.0001 then
+    self.audio:play("navigate")
+  end
+end
+
+function Game:adjust_music_volume(delta)
+  local current_volume = self.audio:get_music_volume()
+  local next_volume = self.audio:adjust_music_volume(delta)
+
+  if math.abs(next_volume - current_volume) > 0.0001 then
+    self.audio:play("navigate")
+  end
+end
+
+function Game:handle_settings_action(control_id)
+  if control_id == "fullscreen" then
+    self:toggle_fullscreen()
+    return true
+  end
+
+  if control_id == "mute" then
+    self:toggle_mute()
+    return true
+  end
+
+  if control_id == "sfx_down" then
+    self:adjust_sfx_volume(-SETTINGS_VOLUME_STEP)
+    return true
+  end
+
+  if control_id == "sfx_up" then
+    self:adjust_sfx_volume(SETTINGS_VOLUME_STEP)
+    return true
+  end
+
+  if control_id == "music_down" then
+    self:adjust_music_volume(-SETTINGS_VOLUME_STEP)
+    return true
+  end
+
+  if control_id == "music_up" then
+    self:adjust_music_volume(SETTINGS_VOLUME_STEP)
+    return true
+  end
+
+  return false
+end
+
+function Game:handle_settings_click(x, y, screen)
+  if not self.settings_visible then
+    return false
+  end
+
+  local controls = self:get_menu_settings_controls(screen)
+
+  if not controls then
+    return false
+  end
+
+  local control_id = self:find_clicked_button(controls, x, y)
+
+  if not control_id then
+    return false
+  end
+
+  return self:handle_settings_action(control_id)
+end
+
 function Game:get_audio_status()
   local hint = "M"
 
@@ -461,8 +723,17 @@ function Game:get_audio_status()
   return {
     text = self.audio:get_status_text(),
     muted = self.audio:is_muted(),
+    sfx_volume = self.audio:get_sfx_volume(),
+    music_volume = self.audio:get_music_volume(),
+    fullscreen = self:is_fullscreen(),
+    settings_visible = self.settings_visible == true,
     hint = hint,
   }
+end
+
+function Game:toggle_settings_visibility()
+  self.settings_visible = not self.settings_visible
+  self.audio:play("navigate")
 end
 
 function Game:get_focused_menu_button_id()
@@ -569,6 +840,11 @@ end
 
 function Game:handle_main_menu_click(x, y)
   local ui = self:get_menu_ui("main_menu")
+
+  if self:handle_settings_click(x, y, "main_menu") then
+    return
+  end
+
   local button_id, button_index = self:find_clicked_button(ui.buttons, x, y)
 
   if not button_id then
@@ -630,6 +906,11 @@ end
 
 function Game:handle_play_menu_click(x, y)
   local ui = self:get_menu_ui("play_menu")
+
+  if self:handle_settings_click(x, y, "play_menu") then
+    return
+  end
+
   local button_id, button_index = self:find_clicked_button(ui.buttons, x, y)
 
   if not button_id then
@@ -769,6 +1050,7 @@ function Game:update(dt)
   if self.play_transition < 1 then
     self.play_transition = math.min(1, self.play_transition + (delta / PLAY_FADE_DURATION))
   end
+  self:update_opening_scene(delta)
 
   if not self.state.winner and self.state.current_player == "player" then
     self:update_cursor_repeat(delta)
@@ -778,6 +1060,7 @@ function Game:update(dt)
 
   self:update_piece_animations(delta)
   self:update_move_animation(delta)
+  self:update_screen_shake(delta)
   self:resolve_forced_pass()
 
   if self.state.winner then
@@ -851,6 +1134,11 @@ function Game:mousepressed(x, y, button)
 end
 
 function Game:keypressed(key)
+  if input.is_toggle_settings_key(key) and (self.screen == "main_menu" or self.screen == "play_menu") then
+    self:toggle_settings_visibility()
+    return
+  end
+
   if input.is_fullscreen_key(key) then
     self:toggle_fullscreen()
     return
@@ -995,6 +1283,11 @@ function Game:keypressed(key)
     self.state = nil
     self.piece_animations = {}
     self.move_animation = nil
+    self.screen_shake.x = 0
+    self.screen_shake.y = 0
+    self.screen_shake.elapsed = 0
+    self.screen_shake.duration = 0
+    self.screen_shake.amplitude = 0
     self.ai_timer = 0
     self.cursor_cell = nil
   end
@@ -1006,7 +1299,8 @@ function Game:draw()
       self:get_focused_menu_button_id(),
       self.menu_transition,
       self.menu_pulse_time,
-      self:get_audio_status()
+      self:get_audio_status(),
+      self.settings_visible
     )
     return
   end
@@ -1018,7 +1312,8 @@ function Game:draw()
       self:get_focused_menu_button_id(),
       self.menu_transition,
       self.menu_pulse_time,
-      self:get_audio_status()
+      self:get_audio_status(),
+      self.settings_visible
     )
     return
   end
@@ -1028,6 +1323,8 @@ function Game:draw()
       cursor_cell = self.cursor_cell,
       piece_animations = self.piece_animations,
       move_animation = self.move_animation,
+      opening_scene = self:get_opening_scene_view(),
+      shake_offset = self:get_screen_shake_offset(),
       transition = self.play_transition,
       ui_time = self.visual_time,
       audio_status = self:get_audio_status(),
