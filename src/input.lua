@@ -16,6 +16,10 @@ function Input.is_fullscreen_key(key)
   return key == "f11" or key == "f"
 end
 
+function Input.is_mute_key(key)
+  return key == "m"
+end
+
 function Input.screen_to_cell(layout, x, y)
   local local_x = x - layout.origin_x
   local local_y = y - layout.origin_y

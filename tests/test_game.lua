@@ -32,6 +32,54 @@ local function count_pairs(tbl)
   return count
 end
 
+local function table_has_value(values, target)
+  for _, value in ipairs(values) do
+    if value == target then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function make_audio_spy(initial_muted)
+  local calls = {}
+  local audio = {
+    muted = initial_muted == true,
+    context = nil,
+  }
+
+  function audio:play(name)
+    calls[#calls + 1] = name
+  end
+
+  function audio:set_context(next_context)
+    self.context = next_context
+  end
+
+  function audio:update()
+  end
+
+  function audio:toggle_muted()
+    self.muted = not self.muted
+    return self.muted
+  end
+
+  function audio:is_muted()
+    return self.muted
+  end
+
+  function audio:get_status_text()
+    if self.muted then
+      return "Audio: Muted"
+    end
+
+    return "Audio: On"
+  end
+
+  return audio, calls
+end
+
 local function blocked_player_state()
   local state = board.new_state(7, 7)
   fill_board(state, "enemy")
@@ -153,6 +201,48 @@ function Tests.play_menu_keyboard_medium_shortcut()
   assert_equal(game.bot_difficulty, "medium", "M hotkey should select medium difficulty")
 end
 
+function Tests.play_menu_shift_m_toggles_mute_instead_of_medium()
+  local game = Game.new()
+  local audio_spy = nil
+  local previous_love = love
+
+  game:set_screen("play_menu")
+  audio_spy = make_audio_spy(false)
+  game.audio = audio_spy
+
+  local ok, err = pcall(function()
+    love = {
+      keyboard = {
+        isDown = function(key)
+          return key == "lshift"
+        end,
+      },
+    }
+
+    game:keypressed("m")
+
+    assert_equal(game.selected_bot_difficulty, "hard", "Shift+M should not change medium difficulty shortcut")
+    assert_equal(game.audio.muted, true, "Shift+M should toggle mute in play menu")
+  end)
+
+  love = previous_love
+
+  if not ok then
+    error(err, 2)
+  end
+end
+
+function Tests.main_menu_m_toggles_mute()
+  local game = Game.new()
+  local audio_spy = nil
+
+  audio_spy = make_audio_spy(false)
+  game.audio = audio_spy
+
+  game:keypressed("m")
+  assert_equal(game.audio.muted, true, "M should toggle mute on main menu")
+end
+
 function Tests.main_menu_arrow_focus_selects_play()
   local game = Game.new()
 
@@ -253,6 +343,28 @@ function Tests.playing_keyboard_cursor_can_select_and_move()
   assert_equal(game.state.current_player, "enemy", "After player move it should become enemy turn")
 end
 
+function Tests.playing_cursor_navigation_plays_cursor_sound()
+  local game = Game.new()
+  local audio_spy, calls = make_audio_spy(false)
+  game:start_game(7, "hard")
+  game.audio = audio_spy
+
+  game:keypressed("right")
+
+  assert_truthy(table_has_value(calls, "cursor_move"), "Moving the board cursor should play cursor move sound")
+end
+
+function Tests.playing_piece_select_plays_select_sound()
+  local game = Game.new()
+  local audio_spy, calls = make_audio_spy(false)
+  game:start_game(7, "hard")
+  game.audio = audio_spy
+
+  game:keypressed("return")
+
+  assert_truthy(table_has_value(calls, "select"), "Selecting a piece should play select sound")
+end
+
 function Tests.playing_arrow_hold_repeats_cursor_movement()
   local game = Game.new()
   game:start_game(7, "hard")
@@ -279,6 +391,105 @@ function Tests.playing_arrow_hold_repeats_cursor_movement()
   if not ok then
     error(err, 2)
   end
+end
+
+function Tests.commit_move_plays_convert_sound_when_enemy_is_converted()
+  local game = Game.new()
+  local audio_spy, calls = make_audio_spy(false)
+
+  game.audio = audio_spy
+  game.state = board.new_state(5, 5)
+  game.state.current_player = "player"
+  board.set_cell(game.state, 1, 1, "player")
+  board.set_cell(game.state, 3, 1, "enemy")
+
+  game:commit_move({
+    kind = "grow",
+    from = { x = 1, y = 1 },
+    to = { x = 2, y = 1 },
+  })
+
+  assert_equal(board.get_cell(game.state, 3, 1), "player", "Move should convert adjacent enemy piece")
+  assert_truthy(table_has_value(calls, "player_move"), "Commit move should play player move sound")
+  assert_truthy(table_has_value(calls, "convert"), "Commit move should play convert sound when pieces flip")
+end
+
+function Tests.commit_move_starts_board_move_animation()
+  local game = Game.new()
+  local audio_spy = make_audio_spy(false)
+
+  game.audio = audio_spy
+  game.state = board.new_state(5, 5)
+  game.state.current_player = "player"
+  board.set_cell(game.state, 1, 1, "player")
+
+  game:commit_move({
+    kind = "grow",
+    from = { x = 1, y = 1 },
+    to = { x = 2, y = 1 },
+  })
+
+  assert_truthy(game.move_animation ~= nil, "Commit move should create a move animation")
+  assert_equal(game.move_animation.kind, "grow", "Move animation should preserve move kind")
+  assert_equal(game.move_animation.from.x, 1, "Move animation should track origin cell")
+  assert_equal(game.move_animation.to.x, 2, "Move animation should track destination cell")
+end
+
+function Tests.commit_move_many_converts_plays_big_capture_sound()
+  local game = Game.new()
+  local audio_spy, calls = make_audio_spy(false)
+
+  game.audio = audio_spy
+  game.state = board.new_state(5, 5)
+  game.state.current_player = "player"
+  board.set_cell(game.state, 1, 1, "player")
+  board.set_cell(game.state, 3, 1, "enemy")
+  board.set_cell(game.state, 1, 2, "enemy")
+  board.set_cell(game.state, 2, 2, "enemy")
+  board.set_cell(game.state, 3, 2, "enemy")
+
+  game:commit_move({
+    kind = "grow",
+    from = { x = 1, y = 1 },
+    to = { x = 2, y = 1 },
+  })
+
+  assert_equal(game.state.last_move.converted, 4, "Setup move should convert four enemy cells")
+  assert_truthy(table_has_value(calls, "big_capture"), "Large conversions should play big capture sound")
+end
+
+function Tests.resolve_forced_pass_plays_pass_sound()
+  local game = Game.new()
+  local audio_spy, calls = make_audio_spy(false)
+
+  game.audio = audio_spy
+  game.ai_delay = 999
+  game.state = blocked_player_state()
+  game:set_screen("playing")
+
+  game:update(0)
+
+  assert_truthy(table_has_value(calls, "pass"), "Auto-pass should trigger pass sound")
+end
+
+function Tests.setting_new_winner_plays_victory_sound()
+  local game = Game.new()
+  local audio_spy, calls = make_audio_spy(false)
+  local previous_state = board.new_state(5, 5)
+  local next_state = nil
+
+  game.audio = audio_spy
+
+  board.set_cell(previous_state, 1, 1, "player")
+  board.set_cell(previous_state, 5, 5, "enemy")
+  previous_state.current_player = "player"
+  next_state = board.clone_state(previous_state)
+  next_state.winner = "player"
+
+  game:set_state(previous_state, false)
+  game:set_state(next_state, previous_state)
+
+  assert_truthy(table_has_value(calls, "win"), "Winner transition should play victory sound")
 end
 
 function Tests.start_game_adds_piece_spawn_animations()

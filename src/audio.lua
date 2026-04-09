@@ -2,6 +2,9 @@ local Audio = {}
 Audio.__index = Audio
 
 local SAMPLE_RATE = 44100
+local DEFAULT_SFX_VOLUME = 0.72
+local DEFAULT_MUSIC_VOLUME = 0.42
+local MUSIC_FADE_SPEED = 1.40
 
 local function clamp(value, minimum, maximum)
   if value < minimum then
@@ -13,6 +16,18 @@ local function clamp(value, minimum, maximum)
   end
 
   return value
+end
+
+local function approach(current, target, max_step)
+  if current < target then
+    return math.min(target, current + max_step)
+  end
+
+  if current > target then
+    return math.max(target, current - max_step)
+  end
+
+  return current
 end
 
 local function has_audio_runtime()
@@ -38,6 +53,74 @@ local function envelope(progress)
   return 1
 end
 
+local function safe_set_looping(source, looping)
+  if source and source.setLooping then
+    source:setLooping(looping)
+  end
+end
+
+local function safe_set_volume(source, volume)
+  if source and source.setVolume then
+    source:setVolume(volume)
+  end
+end
+
+local function safe_is_playing(source)
+  if source and source.isPlaying then
+    return source:isPlaying()
+  end
+
+  return false
+end
+
+local function safe_play(source)
+  if source and source.play then
+    source:play()
+  end
+end
+
+local function safe_pause(source)
+  if source and source.pause then
+    source:pause()
+  end
+end
+
+local function safe_stop(source)
+  if source and source.stop then
+    source:stop()
+  end
+end
+
+local function load_source_if_exists(path, source_type)
+  if not love or not love.filesystem or not love.filesystem.getInfo then
+    return nil
+  end
+
+  if not love.filesystem.getInfo(path) then
+    return nil
+  end
+
+  local ok, source = pcall(love.audio.newSource, path, source_type)
+
+  if not ok then
+    return nil
+  end
+
+  return source
+end
+
+local function load_first_source(paths, source_type)
+  for _, path in ipairs(paths) do
+    local source = load_source_if_exists(path, source_type)
+
+    if source then
+      return source
+    end
+  end
+
+  return nil
+end
+
 local function create_tone_source(frequency, duration, gain)
   local sample_count = math.max(1, math.floor(duration * SAMPLE_RATE))
   local progress_denominator = math.max(1, sample_count - 1)
@@ -56,28 +139,159 @@ local function create_tone_source(frequency, duration, gain)
   return love.audio.newSource(sound_data, "static")
 end
 
+local function create_dual_tone_source(low_frequency, high_frequency, duration, gain)
+  local sample_count = math.max(1, math.floor(duration * SAMPLE_RATE))
+  local progress_denominator = math.max(1, sample_count - 1)
+  local sound_data = love.sound.newSoundData(sample_count, SAMPLE_RATE, 16, 1)
+
+  for index = 0, sample_count - 1 do
+    local t = index / SAMPLE_RATE
+    local progress = index / progress_denominator
+    local low = math.sin((2 * math.pi * low_frequency) * t) * 0.65
+    local high = math.sin((2 * math.pi * high_frequency) * t) * 0.35
+    local shaped = (low + high) * envelope(progress) * gain
+
+    sound_data:setSample(index, clamp(shaped, -1, 1))
+  end
+
+  return love.audio.newSource(sound_data, "static")
+end
+
+local function create_music_loop_source(frequency_a, frequency_b, duration, gain)
+  local sample_count = math.max(1, math.floor(duration * SAMPLE_RATE))
+  local sound_data = love.sound.newSoundData(sample_count, SAMPLE_RATE, 16, 1)
+
+  for index = 0, sample_count - 1 do
+    local t = index / SAMPLE_RATE
+    local drift = (math.sin((2 * math.pi * 0.061) * t) + 1) * 0.5
+    local pulse = 0.68 + (((math.sin((2 * math.pi * 0.147) * t) + 1) * 0.5) * 0.32)
+    local a = math.sin((2 * math.pi * (frequency_a + (drift * 2.0))) * t) * 0.58
+    local b = math.sin((2 * math.pi * frequency_b) * t) * 0.42
+    local sample = (a + b) * 0.24 * pulse * gain
+
+    sound_data:setSample(index, clamp(sample, -1, 1))
+  end
+
+  local source = love.audio.newSource(sound_data, "static")
+  safe_set_looping(source, true)
+  return source
+end
+
 function Audio.new()
   local self = setmetatable({}, Audio)
   self.enabled = false
+  self.muted = false
   self.context = nil
+  self.sfx_volume = DEFAULT_SFX_VOLUME
+  self.music_volume = DEFAULT_MUSIC_VOLUME
+  self.music_fade_speed = MUSIC_FADE_SPEED
   self.sfx = {}
+  self.music_tracks = {}
+  self.music_levels = {}
+  self.target_music = nil
 
   if not has_audio_runtime() then
     return self
   end
 
   local ok = pcall(function()
-    self.sfx.menu_open = create_tone_source(370, 0.08, 0.30)
-    self.sfx.navigate = create_tone_source(460, 0.05, 0.24)
-    self.sfx.confirm = create_tone_source(620, 0.09, 0.30)
-    self.sfx.game_start = create_tone_source(295, 0.12, 0.34)
-    self.sfx.player_move = create_tone_source(520, 0.08, 0.30)
-    self.sfx.enemy_move = create_tone_source(235, 0.10, 0.28)
+    self.sfx.menu_open = load_first_source({
+      "assets/audio/sfx/menu_open.ogg",
+      "assets/audio/sfx/menu_open.wav",
+    }, "static") or create_tone_source(370, 0.08, 0.30)
+
+    self.sfx.navigate = load_first_source({
+      "assets/audio/sfx/navigate.ogg",
+      "assets/audio/sfx/navigate.wav",
+    }, "static") or create_tone_source(460, 0.05, 0.24)
+
+    self.sfx.confirm = load_first_source({
+      "assets/audio/sfx/confirm.ogg",
+      "assets/audio/sfx/confirm.wav",
+    }, "static") or create_tone_source(620, 0.09, 0.30)
+
+    self.sfx.game_start = load_first_source({
+      "assets/audio/sfx/game_start.ogg",
+      "assets/audio/sfx/game_start.wav",
+    }, "static") or create_tone_source(295, 0.12, 0.34)
+
+    self.sfx.player_move = load_first_source({
+      "assets/audio/sfx/player_move.ogg",
+      "assets/audio/sfx/player_move.wav",
+    }, "static") or create_tone_source(520, 0.08, 0.30)
+
+    self.sfx.enemy_move = load_first_source({
+      "assets/audio/sfx/enemy_move.ogg",
+      "assets/audio/sfx/enemy_move.wav",
+    }, "static") or create_tone_source(235, 0.10, 0.28)
+
+    self.sfx.cursor_move = load_first_source({
+      "assets/audio/sfx/cursor_move.ogg",
+      "assets/audio/sfx/cursor_move.wav",
+    }, "static") or create_tone_source(440, 0.04, 0.18)
+
+    self.sfx.select = load_first_source({
+      "assets/audio/sfx/select.ogg",
+      "assets/audio/sfx/select.wav",
+    }, "static") or create_tone_source(690, 0.05, 0.22)
+
+    self.sfx.invalid = load_first_source({
+      "assets/audio/sfx/invalid.ogg",
+      "assets/audio/sfx/invalid.wav",
+    }, "static") or create_tone_source(190, 0.07, 0.20)
+
+    self.sfx.convert = load_first_source({
+      "assets/audio/sfx/convert.ogg",
+      "assets/audio/sfx/convert.wav",
+    }, "static") or create_dual_tone_source(410, 580, 0.11, 0.30)
+
+    self.sfx.big_capture = load_first_source({
+      "assets/audio/sfx/big_capture.ogg",
+      "assets/audio/sfx/big_capture.wav",
+    }, "static") or create_dual_tone_source(430, 860, 0.15, 0.36)
+
+    self.sfx.pass = load_first_source({
+      "assets/audio/sfx/pass.ogg",
+      "assets/audio/sfx/pass.wav",
+    }, "static") or create_tone_source(255, 0.09, 0.24)
+
+    self.sfx.win = load_first_source({
+      "assets/audio/sfx/win.ogg",
+      "assets/audio/sfx/win.wav",
+    }, "static") or create_dual_tone_source(510, 760, 0.16, 0.34)
+
+    self.sfx.lose = load_first_source({
+      "assets/audio/sfx/lose.ogg",
+      "assets/audio/sfx/lose.wav",
+    }, "static") or create_dual_tone_source(290, 180, 0.16, 0.32)
+
+    self.sfx.tie = load_first_source({
+      "assets/audio/sfx/tie.ogg",
+      "assets/audio/sfx/tie.wav",
+    }, "static") or create_dual_tone_source(330, 330, 0.14, 0.28)
+
+    self.music_tracks.menu = load_first_source({
+      "assets/audio/music/menu.ogg",
+      "assets/audio/music/menu.wav",
+    }, "stream") or create_music_loop_source(156, 210, 8.0, 0.90)
+
+    self.music_tracks.game = load_first_source({
+      "assets/audio/music/game.ogg",
+      "assets/audio/music/game.wav",
+    }, "stream") or create_music_loop_source(132, 174, 8.0, 0.90)
   end)
 
   if not ok then
     self.sfx = {}
+    self.music_tracks = {}
+    self.music_levels = {}
     return self
+  end
+
+  for track_name, source in pairs(self.music_tracks) do
+    safe_set_looping(source, true)
+    safe_set_volume(source, 0)
+    self.music_levels[track_name] = 0
   end
 
   self.enabled = true
@@ -85,7 +299,7 @@ function Audio.new()
 end
 
 function Audio:play(effect_name)
-  if not self.enabled then
+  if not self.enabled or self.muted then
     return
   end
 
@@ -95,24 +309,99 @@ function Audio:play(effect_name)
     return
   end
 
-  source:stop()
-  source:play()
+  safe_set_volume(source, self.sfx_volume)
+  safe_stop(source)
+  safe_play(source)
+end
+
+function Audio:is_muted()
+  return self.muted
+end
+
+function Audio:toggle_muted()
+  self.muted = not self.muted
+  return self.muted
+end
+
+function Audio:get_status_text()
+  if self.muted then
+    return "Audio: Muted"
+  end
+
+  return "Audio: On"
+end
+
+function Audio:set_target_music(track_name)
+  if self.target_music == track_name then
+    return
+  end
+
+  self.target_music = track_name
+
+  if not track_name then
+    return
+  end
+
+  local source = self.music_tracks[track_name]
+
+  if source and not safe_is_playing(source) then
+    safe_play(source)
+  end
 end
 
 function Audio:set_context(next_context)
-  if self.context == next_context then
+  if self.context == next_context and self.target_music then
     return
   end
 
   self.context = next_context
 
   if next_context == "menu" then
+    self:set_target_music("menu")
     self:play("menu_open")
     return
   end
 
   if next_context == "game" then
+    self:set_target_music("game")
     self:play("game_start")
+    return
+  end
+
+  self:set_target_music(nil)
+end
+
+function Audio:update(dt)
+  if not self.enabled then
+    return
+  end
+
+  local delta = dt or 0
+  local fade_step = math.max(0, delta * self.music_fade_speed)
+
+  for track_name, source in pairs(self.music_tracks) do
+    local target_volume = 0
+    if not self.muted and self.target_music == track_name then
+      target_volume = self.music_volume
+    end
+
+    local current_volume = self.music_levels[track_name] or 0
+    local next_volume = target_volume
+
+    if fade_step > 0 then
+      next_volume = approach(current_volume, target_volume, fade_step)
+    end
+
+    self.music_levels[track_name] = next_volume
+    safe_set_volume(source, next_volume)
+
+    if next_volume > 0.001 then
+      if not safe_is_playing(source) then
+        safe_play(source)
+      end
+    elseif self.target_music ~= track_name and safe_is_playing(source) then
+      safe_pause(source)
+    end
   end
 end
 

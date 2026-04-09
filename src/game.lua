@@ -13,6 +13,9 @@ local MENU_FADE_DURATION = 0.80
 local PLAY_FADE_DURATION = 0.24
 local PIECE_SPAWN_DURATION = 0.18
 local PIECE_CONVERT_DURATION = 0.24
+local MOVE_GROW_DURATION = 0.34
+local MOVE_JUMP_DURATION = 0.30
+local BIG_CAPTURE_THRESHOLD = 3
 local CURSOR_REPEAT_DELAY = 0.22
 local CURSOR_REPEAT_INTERVAL = 0.07
 
@@ -41,6 +44,14 @@ end
 
 local function is_confirm_key(key)
   return key == "return" or key == "kpenter" or key == "space"
+end
+
+local function is_shift_down()
+  if not love or not love.keyboard or not love.keyboard.isDown then
+    return false
+  end
+
+  return love.keyboard.isDown("lshift") or love.keyboard.isDown("rshift")
 end
 
 local function find_button_index(buttons, button_id)
@@ -130,6 +141,7 @@ function Game.new()
   self.play_transition = 1
   self.visual_time = 0
   self.piece_animations = {}
+  self.move_animation = nil
   self.cursor_repeat = {
     up = { held = false, elapsed = 0 },
     down = { held = false, elapsed = 0 },
@@ -144,8 +156,44 @@ function Game.new()
 end
 
 function Game:set_state(next_state, previous_state)
+  local prior_state = previous_state
+
+  if prior_state == nil then
+    prior_state = self.state
+  elseif prior_state == false then
+    prior_state = nil
+  end
+
   self.state = next_state
-  self.piece_animations = build_piece_animations(previous_state, next_state)
+  self.piece_animations = build_piece_animations(prior_state, next_state)
+  self:handle_state_audio_events(prior_state, next_state)
+end
+
+function Game:handle_state_audio_events(previous_state, next_state)
+  if not previous_state or not next_state then
+    return
+  end
+
+  local previous_pass_count = previous_state.pass_count or 0
+  local next_pass_count = next_state.pass_count or 0
+
+  if next_pass_count > previous_pass_count then
+    self.audio:play("pass")
+  end
+
+  if not previous_state.winner and next_state.winner then
+    if next_state.winner == "player" then
+      self.audio:play("win")
+      return
+    end
+
+    if next_state.winner == "enemy" then
+      self.audio:play("lose")
+      return
+    end
+
+    self.audio:play("tie")
+  end
 end
 
 function Game:reset_cursor_repeat()
@@ -164,9 +212,10 @@ function Game:start_game(board_size, bot_difficulty)
   self.board_size = size
   self.bot_difficulty = difficulty
   local next_state = rules.resolve_state(level.load(size))
-  self:set_state(next_state, nil)
+  self:set_state(next_state, false)
   self:set_screen("playing")
   self.ai_timer = 0
+  self.move_animation = nil
   self.cursor_cell = find_first_player_cell(self.state)
 end
 
@@ -176,9 +225,32 @@ function Game:restart()
   end
 
   local next_state = rules.resolve_state(level.load(self.board_size))
-  self:set_state(next_state, nil)
+  self:set_state(next_state, false)
   self.ai_timer = 0
+  self.move_animation = nil
   self.cursor_cell = find_first_player_cell(self.state)
+end
+
+function Game:start_move_animation(side, last_move)
+  if not last_move then
+    self.move_animation = nil
+    return
+  end
+
+  local duration = MOVE_GROW_DURATION
+  if last_move.kind == "jump" then
+    duration = MOVE_JUMP_DURATION
+  end
+
+  self.move_animation = {
+    kind = last_move.kind,
+    side = side or "player",
+    from = { x = last_move.from.x, y = last_move.from.y },
+    to = { x = last_move.to.x, y = last_move.to.y },
+    converted = last_move.converted or 0,
+    progress = 0,
+    duration = duration,
+  }
 end
 
 function Game:commit_move(move)
@@ -192,6 +264,21 @@ function Game:commit_move(move)
   elseif moving_side == "enemy" then
     self.audio:play("enemy_move")
   end
+
+  local converted = self.state
+    and self.state.last_move
+    and self.state.last_move.converted
+    or 0
+
+  if converted > 0 then
+    self.audio:play("convert")
+  end
+
+  if converted >= BIG_CAPTURE_THRESHOLD then
+    self.audio:play("big_capture")
+  end
+
+  self:start_move_animation(moving_side, self.state and self.state.last_move)
 end
 
 function Game:update_piece_animations(dt)
@@ -213,6 +300,21 @@ function Game:update_piece_animations(dt)
     if progress >= 1 then
       self.piece_animations[key] = nil
     end
+  end
+end
+
+function Game:update_move_animation(dt)
+  if not self.move_animation then
+    return
+  end
+
+  local delta = dt or 0
+  local duration = self.move_animation.duration or MOVE_GROW_DURATION
+  local progress = self.move_animation.progress + (delta / duration)
+  self.move_animation.progress = progress
+
+  if progress >= 1 then
+    self.move_animation = nil
   end
 end
 
@@ -331,6 +433,36 @@ function Game:toggle_fullscreen()
   if not ok then
     pcall(love.window.setFullscreen, not is_fullscreen)
   end
+end
+
+function Game:can_toggle_mute()
+  if self.screen ~= "play_menu" then
+    return true
+  end
+
+  return is_shift_down()
+end
+
+function Game:toggle_mute()
+  local muted = self.audio:toggle_muted()
+
+  if not muted then
+    self.audio:play("navigate")
+  end
+end
+
+function Game:get_audio_status()
+  local hint = "M"
+
+  if self.screen == "play_menu" then
+    hint = "Shift+M"
+  end
+
+  return {
+    text = self.audio:get_status_text(),
+    muted = self.audio:is_muted(),
+    hint = hint,
+  }
 end
 
 function Game:get_focused_menu_button_id()
@@ -533,7 +665,12 @@ function Game:move_cursor(dx, dy)
     next_y = self.state.height
   end
 
+  local changed = self.cursor_cell.x ~= next_x or self.cursor_cell.y ~= next_y
   self.cursor_cell = { x = next_x, y = next_y }
+
+  if changed then
+    self.audio:play("cursor_move")
+  end
 end
 
 function Game:activate_cursor_cell()
@@ -542,6 +679,7 @@ function Game:activate_cursor_cell()
   end
 
   if self.state.winner or self.state.current_player ~= "player" then
+    self.audio:play("invalid")
     return
   end
 
@@ -561,9 +699,11 @@ function Game:activate_cursor_cell()
       self.state.selected_cell = nil
     else
       self.state.selected_cell = { x = cell.x, y = cell.y }
+      self.audio:play("select")
     end
   else
     self.state.selected_cell = nil
+    self.audio:play("invalid")
   end
 end
 
@@ -579,7 +719,8 @@ function Game:run_enemy_turn()
   local move = ai.choose_move(self.state, "enemy", self.bot_difficulty)
 
   if not move then
-    self.state = rules.resolve_state(self.state)
+    local next_state = rules.resolve_state(self.state)
+    self:set_state(next_state, self.state)
     self.ai_timer = 0
     return
   end
@@ -603,13 +744,15 @@ function Game:resolve_forced_pass()
     return
   end
 
-  self.state = rules.resolve_state(self.state)
+  local next_state = rules.resolve_state(self.state)
+  self:set_state(next_state, self.state)
   self.ai_timer = 0
 end
 
 function Game:update(dt)
   local delta = dt or 0
   self.visual_time = self.visual_time + delta
+  self.audio:update(delta)
 
   if self.screen == "main_menu" or self.screen == "play_menu" then
     self.menu_pulse_time = self.menu_pulse_time + delta
@@ -634,6 +777,7 @@ function Game:update(dt)
   end
 
   self:update_piece_animations(delta)
+  self:update_move_animation(delta)
   self:resolve_forced_pass()
 
   if self.state.winner then
@@ -699,6 +843,7 @@ function Game:mousepressed(x, y, button)
       self.state.selected_cell = nil
     else
       self.state.selected_cell = { x = cell.x, y = cell.y }
+      self.audio:play("select")
     end
   else
     self.state.selected_cell = nil
@@ -708,6 +853,11 @@ end
 function Game:keypressed(key)
   if input.is_fullscreen_key(key) then
     self:toggle_fullscreen()
+    return
+  end
+
+  if input.is_mute_key(key) and self:can_toggle_mute() then
+    self:toggle_mute()
     return
   end
 
@@ -844,6 +994,7 @@ function Game:keypressed(key)
     self:set_screen("main_menu")
     self.state = nil
     self.piece_animations = {}
+    self.move_animation = nil
     self.ai_timer = 0
     self.cursor_cell = nil
   end
@@ -854,7 +1005,8 @@ function Game:draw()
     render.draw_main_menu(
       self:get_focused_menu_button_id(),
       self.menu_transition,
-      self.menu_pulse_time
+      self.menu_pulse_time,
+      self:get_audio_status()
     )
     return
   end
@@ -865,7 +1017,8 @@ function Game:draw()
       self.selected_bot_difficulty,
       self:get_focused_menu_button_id(),
       self.menu_transition,
-      self.menu_pulse_time
+      self.menu_pulse_time,
+      self:get_audio_status()
     )
     return
   end
@@ -874,8 +1027,10 @@ function Game:draw()
     render.draw(self.state, {
       cursor_cell = self.cursor_cell,
       piece_animations = self.piece_animations,
+      move_animation = self.move_animation,
       transition = self.play_transition,
       ui_time = self.visual_time,
+      audio_status = self:get_audio_status(),
     })
   end
 end
