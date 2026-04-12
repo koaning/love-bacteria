@@ -47,6 +47,11 @@ local function make_audio_spy(initial_muted)
   local audio = {
     muted = initial_muted == true,
     context = nil,
+    context_calls = {},
+    target_music = nil,
+    target_music_calls = {},
+    sfx_volume = 0.72,
+    music_volume = 0.42,
   }
 
   function audio:play(name)
@@ -55,6 +60,12 @@ local function make_audio_spy(initial_muted)
 
   function audio:set_context(next_context)
     self.context = next_context
+    self.context_calls[#self.context_calls + 1] = next_context
+  end
+
+  function audio:set_target_music(track_name)
+    self.target_music = track_name
+    self.target_music_calls[#self.target_music_calls + 1] = track_name or "__none__"
   end
 
   function audio:update()
@@ -77,7 +88,47 @@ local function make_audio_spy(initial_muted)
     return "Audio: On"
   end
 
+  function audio:get_sfx_volume()
+    return self.sfx_volume
+  end
+
+  function audio:get_music_volume()
+    return self.music_volume
+  end
+
+  function audio:adjust_sfx_volume(delta)
+    local next_volume = self.sfx_volume + (delta or 0)
+    if next_volume < 0 then
+      next_volume = 0
+    elseif next_volume > 1 then
+      next_volume = 1
+    end
+    self.sfx_volume = next_volume
+    return self.sfx_volume
+  end
+
+  function audio:adjust_music_volume(delta)
+    local next_volume = self.music_volume + (delta or 0)
+    if next_volume < 0 then
+      next_volume = 0
+    elseif next_volume > 1 then
+      next_volume = 1
+    end
+    self.music_volume = next_volume
+    return self.music_volume
+  end
+
   return audio, calls
+end
+
+local function find_control_rect(controls, control_id)
+  for _, control in ipairs(controls or {}) do
+    if control.id == control_id then
+      return control
+    end
+  end
+
+  return nil
 end
 
 local function blocked_player_state()
@@ -170,6 +221,30 @@ function Tests.play_transition_advances_during_gameplay()
   assert_equal(game.play_transition, 1, "Gameplay transition should cap at full visibility")
 end
 
+function Tests.start_game_intro_keeps_shared_music_running_until_game_cue()
+  local game = Game.new()
+  local audio_spy = make_audio_spy(false)
+  local initial_context_calls = 0
+
+  game.audio = audio_spy
+  game:set_screen("play_menu")
+  initial_context_calls = #game.audio.context_calls
+
+  game:start_game(7, "hard")
+
+  assert_equal(#game.audio.target_music_calls, 0, "Shared music should keep running during intro")
+  assert_equal(#game.audio.context_calls, initial_context_calls, "Game music should not start immediately when intro begins")
+
+  game:update(0.45)
+  assert_equal(#game.audio.context_calls, initial_context_calls, "Game music should wait until opening scene reaches cue point")
+
+  game:update(0.20)
+  assert_equal(game.audio.context_calls[#game.audio.context_calls], "game", "Game music should start during opening scene")
+
+  game:update(1.0)
+  assert_truthy(game:get_opening_scene_view() and game:get_opening_scene_view().active == false, "Opening scene should end after enough time")
+end
+
 function Tests.main_menu_keyboard_shortcuts()
   local game = Game.new()
 
@@ -241,6 +316,58 @@ function Tests.main_menu_m_toggles_mute()
 
   game:keypressed("m")
   assert_equal(game.audio.muted, true, "M should toggle mute on main menu")
+end
+
+function Tests.main_menu_settings_row_clicks_adjust_volume_and_mute()
+  local game = Game.new()
+  local audio_spy, calls = make_audio_spy(false)
+  local ui = nil
+  local sfx_up = nil
+  local music_down = nil
+  local mute = nil
+
+  game.audio = audio_spy
+  game.settings_visible = true
+  ui = game:get_menu_ui("main_menu")
+  sfx_up = find_control_rect(ui.settings_controls, "sfx_up")
+  music_down = find_control_rect(ui.settings_controls, "music_down")
+  mute = find_control_rect(ui.settings_controls, "mute")
+
+  game:handle_main_menu_click(sfx_up.x + 2, sfx_up.y + 2)
+  assert_truthy(game.audio.sfx_volume > 0.72, "Clicking SFX+ should increase sfx volume")
+
+  game:handle_main_menu_click(music_down.x + 2, music_down.y + 2)
+  assert_truthy(game.audio.music_volume < 0.42, "Clicking Music- should decrease music volume")
+
+  game:handle_main_menu_click(mute.x + 2, mute.y + 2)
+  assert_equal(game.audio.muted, true, "Clicking mute control should toggle mute")
+  assert_truthy(table_has_value(calls, "navigate"), "Volume controls should play navigation feedback sound")
+end
+
+function Tests.main_menu_tab_toggles_settings_visibility()
+  local game = Game.new()
+
+  assert_equal(game.settings_visible, false, "Settings should be hidden by default")
+  game:keypressed("tab")
+  assert_equal(game.settings_visible, true, "Tab should show settings in main menu")
+  game:keypressed("tab")
+  assert_equal(game.settings_visible, false, "Tab should hide settings in main menu")
+end
+
+function Tests.hidden_settings_row_does_not_handle_clicks()
+  local game = Game.new()
+  local audio_spy = nil
+  local ui = nil
+  local sfx_up = nil
+
+  audio_spy = make_audio_spy(false)
+  game.audio = audio_spy
+  game.settings_visible = false
+  ui = game:get_menu_ui("main_menu")
+  sfx_up = find_control_rect(ui.settings_controls, "sfx_up")
+
+  game:handle_main_menu_click(sfx_up.x + 2, sfx_up.y + 2)
+  assert_equal(game.audio.sfx_volume, 0.72, "Settings click should be ignored while settings are hidden")
 end
 
 function Tests.main_menu_arrow_focus_selects_play()
@@ -456,6 +583,22 @@ function Tests.commit_move_many_converts_plays_big_capture_sound()
 
   assert_equal(game.state.last_move.converted, 4, "Setup move should convert four enemy cells")
   assert_truthy(table_has_value(calls, "big_capture"), "Large conversions should play big capture sound")
+  assert_truthy(game.screen_shake and game.screen_shake.amplitude > 0, "Large conversions should trigger screen shake")
+  assert_truthy(game.screen_shake.duration > 0, "Large conversions should set shake duration")
+end
+
+function Tests.screen_shake_expires_after_duration()
+  local game = Game.new()
+  local audio_spy = make_audio_spy(false)
+
+  game.audio = audio_spy
+  game:trigger_screen_shake(4, 0.1)
+  game:update_screen_shake(0.2)
+
+  assert_equal(game.screen_shake.amplitude, 0, "Shake amplitude should clear after duration elapses")
+  assert_equal(game.screen_shake.duration, 0, "Shake duration should clear after duration elapses")
+  assert_equal(game.screen_shake.x, 0, "Shake x offset should reset when shake ends")
+  assert_equal(game.screen_shake.y, 0, "Shake y offset should reset when shake ends")
 end
 
 function Tests.resolve_forced_pass_plays_pass_sound()

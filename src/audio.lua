@@ -2,9 +2,26 @@ local Audio = {}
 Audio.__index = Audio
 
 local SAMPLE_RATE = 44100
-local DEFAULT_SFX_VOLUME = 0.72
-local DEFAULT_MUSIC_VOLUME = 0.42
+local DEFAULT_SFX_VOLUME = 0.56
+local DEFAULT_MUSIC_VOLUME = 0.50
 local MUSIC_FADE_SPEED = 1.40
+local SFX_LEVELS = {
+  menu_open = 0.70,
+  navigate = 0.62,
+  confirm = 0.66,
+  game_start = 0.72,
+  player_move = 0.74,
+  enemy_move = 0.70,
+  cursor_move = 0.50,
+  select = 0.64,
+  invalid = 0.45,
+  convert = 0.62,
+  big_capture = 0.56,
+  pass = 0.60,
+  win = 0.64,
+  lose = 0.60,
+  tie = 0.58,
+}
 
 local function clamp(value, minimum, maximum)
   if value < minimum then
@@ -130,8 +147,8 @@ local function create_tone_source(frequency, duration, gain)
     local t = index / SAMPLE_RATE
     local progress = index / progress_denominator
     local base = math.sin((2 * math.pi * frequency) * t)
-    local harmonic = math.sin((2 * math.pi * frequency * 2) * t) * 0.35
-    local shaped = (base + harmonic) * 0.55 * envelope(progress) * gain
+    local harmonic = math.sin((2 * math.pi * frequency * 1.5) * t) * 0.20
+    local shaped = (base + harmonic) * 0.45 * envelope(progress) * gain
 
     sound_data:setSample(index, clamp(shaped, -1, 1))
   end
@@ -147,9 +164,9 @@ local function create_dual_tone_source(low_frequency, high_frequency, duration, 
   for index = 0, sample_count - 1 do
     local t = index / SAMPLE_RATE
     local progress = index / progress_denominator
-    local low = math.sin((2 * math.pi * low_frequency) * t) * 0.65
-    local high = math.sin((2 * math.pi * high_frequency) * t) * 0.35
-    local shaped = (low + high) * envelope(progress) * gain
+    local low = math.sin((2 * math.pi * low_frequency) * t) * 0.74
+    local high = math.sin((2 * math.pi * high_frequency) * t) * 0.20
+    local shaped = (low + high) * envelope(progress) * gain * 0.78
 
     sound_data:setSample(index, clamp(shaped, -1, 1))
   end
@@ -157,17 +174,70 @@ local function create_dual_tone_source(low_frequency, high_frequency, duration, 
   return love.audio.newSource(sound_data, "static")
 end
 
-local function create_music_loop_source(frequency_a, frequency_b, duration, gain)
+local function semitone_ratio(semitones)
+  return 2 ^ (semitones / 12)
+end
+
+local function smoothstep(value)
+  local t = clamp(value, 0, 1)
+  return t * t * (3 - (2 * t))
+end
+
+local function chord_voice_gain(index)
+  if index == 1 then
+    return 0.27
+  end
+
+  if index == 2 then
+    return 0.20
+  end
+
+  if index == 3 then
+    return 0.15
+  end
+
+  return 0.10
+end
+
+local function chord_sample(root_frequency, chord, t, drift)
+  local root_shift = chord.root_shift or 0
+  local intervals = chord.intervals or { 0, 4, 7, 11 }
+  local chord_root = root_frequency * semitone_ratio(root_shift)
+  local sample = math.sin((2 * math.pi * (chord_root * 0.5)) * t) * 0.13
+
+  for index, interval in ipairs(intervals) do
+    local note_frequency = (chord_root * semitone_ratio(interval)) + drift
+    sample = sample + (math.sin((2 * math.pi * note_frequency) * t) * chord_voice_gain(index))
+  end
+
+  return sample
+end
+
+local function create_progression_music_loop_source(root_frequency, progression, bar_duration, gain)
+  local chords = progression or {
+    { root_shift = 0, intervals = { 0, 4, 7, 11 } },
+  }
+  local chord_count = math.max(1, #chords)
+  local seconds_per_bar = bar_duration or 2.0
+  local duration = seconds_per_bar * chord_count
   local sample_count = math.max(1, math.floor(duration * SAMPLE_RATE))
   local sound_data = love.sound.newSoundData(sample_count, SAMPLE_RATE, 16, 1)
 
   for index = 0, sample_count - 1 do
     local t = index / SAMPLE_RATE
-    local drift = (math.sin((2 * math.pi * 0.061) * t) + 1) * 0.5
-    local pulse = 0.68 + (((math.sin((2 * math.pi * 0.147) * t) + 1) * 0.5) * 0.32)
-    local a = math.sin((2 * math.pi * (frequency_a + (drift * 2.0))) * t) * 0.58
-    local b = math.sin((2 * math.pi * frequency_b) * t) * 0.42
-    local sample = (a + b) * 0.24 * pulse * gain
+    local bar_position = t / seconds_per_bar
+    local bar_index = math.floor(bar_position)
+    local bar_phase = bar_position - bar_index
+    local current_index = (bar_index % chord_count) + 1
+    local next_index = (current_index % chord_count) + 1
+    local transition = smoothstep((bar_phase - 0.72) / 0.28)
+    local drift = math.sin((2 * math.pi * 0.058) * t) * 1.6
+    local pulse = 0.82 + (((math.sin((2 * math.pi * 0.52) * t) + 1) * 0.5) * 0.12)
+    local shimmer = 0.92 + (((math.sin((2 * math.pi * 1.12) * t) + 1) * 0.5) * 0.08)
+    local from_chord = chord_sample(root_frequency, chords[current_index], t, drift)
+    local to_chord = chord_sample(root_frequency, chords[next_index], t, drift)
+    local mixed = (from_chord * (1 - transition)) + (to_chord * transition)
+    local sample = mixed * 0.19 * pulse * shimmer * gain
 
     sound_data:setSample(index, clamp(sample, -1, 1))
   end
@@ -270,15 +340,15 @@ function Audio.new()
       "assets/audio/sfx/tie.wav",
     }, "static") or create_dual_tone_source(330, 330, 0.14, 0.28)
 
-    self.music_tracks.menu = load_first_source({
-      "assets/audio/music/menu.ogg",
-      "assets/audio/music/menu.wav",
-    }, "stream") or create_music_loop_source(156, 210, 8.0, 0.90)
-
     self.music_tracks.game = load_first_source({
       "assets/audio/music/game.ogg",
       "assets/audio/music/game.wav",
-    }, "stream") or create_music_loop_source(132, 174, 8.0, 0.90)
+    }, "stream") or create_progression_music_loop_source(196, {
+      { root_shift = 0, intervals = { 0, 4, 7, 11 } },
+      { root_shift = 5, intervals = { 0, 4, 7, 11 } },
+      { root_shift = 7, intervals = { 0, 4, 7, 11 } },
+      { root_shift = 0, intervals = { 0, 4, 7, 14 } },
+    }, 4.0, 0.95)
   end)
 
   if not ok then
@@ -309,7 +379,8 @@ function Audio:play(effect_name)
     return
   end
 
-  safe_set_volume(source, self.sfx_volume)
+  local level = SFX_LEVELS[effect_name] or 1
+  safe_set_volume(source, self.sfx_volume * level)
   safe_stop(source)
   safe_play(source)
 end
@@ -321,6 +392,26 @@ end
 function Audio:toggle_muted()
   self.muted = not self.muted
   return self.muted
+end
+
+function Audio:get_sfx_volume()
+  return self.sfx_volume or DEFAULT_SFX_VOLUME
+end
+
+function Audio:get_music_volume()
+  return self.music_volume or DEFAULT_MUSIC_VOLUME
+end
+
+function Audio:adjust_sfx_volume(delta)
+  local shift = delta or 0
+  self.sfx_volume = clamp((self.sfx_volume or DEFAULT_SFX_VOLUME) + shift, 0, 1)
+  return self.sfx_volume
+end
+
+function Audio:adjust_music_volume(delta)
+  local shift = delta or 0
+  self.music_volume = clamp((self.music_volume or DEFAULT_MUSIC_VOLUME) + shift, 0, 1)
+  return self.music_volume
 end
 
 function Audio:get_status_text()
@@ -357,7 +448,7 @@ function Audio:set_context(next_context)
   self.context = next_context
 
   if next_context == "menu" then
-    self:set_target_music("menu")
+    self:set_target_music("game")
     self:play("menu_open")
     return
   end

@@ -20,6 +20,10 @@ function Input.is_mute_key(key)
   return key == "m"
 end
 
+function Input.is_toggle_settings_key(key)
+  return key == "tab"
+end
+
 function Input.screen_to_cell(layout, x, y)
   local local_x = x - layout.origin_x
   local local_y = y - layout.origin_y

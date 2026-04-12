@@ -39,12 +39,61 @@ make build
 
 This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `dist/Sporeline.app`.
 
+## Web Build (Playable Embed)
+
+To prepare a browser-playable build:
+
+1. Download the web runtime:
+
+```bash
+make fetch-lovejs
+```
+
+2. Build the web package:
+
+```bash
+make web
+```
+
+This creates `dist/web/` with:
+- `index.html` player page
+- `sporeline.love` game package
+- header config files (`_headers`, `.htaccess`) required by `love.js`
+
+Deploy `dist/web/` to a host where you can set these headers:
+
+- `Cross-Origin-Opener-Policy: same-origin`
+- `Cross-Origin-Embedder-Policy: require-corp`
+
+Then embed in your blog with an iframe:
+
+```html
+<iframe
+  src="https://games.your-domain.com/sporeline/"
+  width="900"
+  height="900"
+  style="border:0;max-width:100%;"
+  loading="lazy"
+></iframe>
+```
+
+If your blog platform cannot set those headers, host the game on a separate static host/subdomain and embed that URL.
+
+For local testing, serve `dist/web/` (not the source `web/` folder):
+
+```bash
+cd dist/web
+python3 -m http.server 8000
+```
+
 ## Controls
 
 - Main menu: click `Play`, choose `5x5`, `7x7`, or `9x9`, pick bot difficulty (`Easy`, `Medium`, or `Hard`), then click `Start`.
 - Menu keyboard: `Arrow keys` move focus logically, `Enter`/`Space` activates focused button.
 - Main menu keyboard: `P` opens Play, `Esc` quits.
 - Play menu keyboard: `5`/`7`/`9` choose board size, `E`/`M`/`H` choose bot difficulty, `Esc` goes back.
+- `Tab` shows/hides the menu settings row.
+- Menus include a settings row for `Fullscreen`, `Mute`, and `SFX/Music` volume (`+/-`) via mouse click.
 - Left click one of your bacteria to select it.
 - Left click a highlighted cell to move.
 - In game keyboard: `Arrow keys` move the cursor, `Enter`/`Space` select and move.
@@ -74,8 +123,9 @@ This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `di
 - `src/ai.lua` contains enemy move selection logic for easy/medium/hard difficulties.
 - `src/render.lua` draws the board, HUD, highlights, and end-game overlay.
 - `src/input.lua` handles simple mouse and keyboard helpers.
-- `src/audio.lua` manages SFX, mute state, and menu/game music track fading.
-- `assets/audio/` (optional) can provide custom `sfx/*.ogg` and `music/{menu,game}.ogg` files.
+- `src/audio.lua` manages SFX, mute state, and shared background music fading.
+- `assets/audio/` (optional) can provide custom `sfx/*.ogg` and `music/game.ogg` files.
+- `web/` contains the browser player template and header config used by `make web`.
 - `src/level.lua` defines the starting layout for the chosen board size.
 - `src/game.lua` coordinates turn flow and AI timing.
 - `assets/fonts/` contains bundled UI fonts used for title/body typography.

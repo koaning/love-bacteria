@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sporeline</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(circle at 20% 20%, #f7fbff, #e7eef7 65%);
+        color: #1d2c3b;
+        font-family: "Atkinson Hyperlegible", Arial, sans-serif;
+      }
+
+      .shell {
+        width: min(96vw, 960px);
+        padding: 12px;
+        border-radius: 14px;
+        border: 1px solid #b8cadf;
+        background: rgba(255, 255, 255, 0.94);
+        box-shadow: 0 16px 48px rgba(36, 66, 102, 0.16);
+      }
+
+      .title {
+        margin: 0 0 6px;
+        font-size: clamp(1.1rem, 2vw, 1.5rem);
+        letter-spacing: 0.05em;
+      }
+
+      .hint {
+        margin: 0 0 12px;
+        font-size: 0.9rem;
+        color: #5f748e;
+      }
+
+      #game-container {
+        min-height: 640px;
+        display: grid;
+        place-items: center;
+      }
+
+      canvas {
+        width: 100%;
+        max-width: min(96vw, 960px);
+        height: auto !important;
+        max-height: 82vh;
+        display: block;
+        margin: 0 auto;
+        border-radius: 10px;
+      }
+
+      #game-container:fullscreen,
+      #game-container:-webkit-full-screen {
+        width: 100vw;
+        height: 100vh;
+        background: #000;
+        padding: 0;
+      }
+
+      #game-container:fullscreen canvas,
+      #game-container:-webkit-full-screen canvas,
+      canvas:fullscreen,
+      canvas:-webkit-full-screen {
+        width: 100vw !important;
+        height: 100vh !important;
+        max-width: none !important;
+        max-height: none !important;
+        object-fit: contain;
+        border-radius: 0;
+      }
+
+      .error {
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #a84a4a;
+        background: #281414;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="shell">
+      <h1 class="title">Sporeline</h1>
+      <p class="hint">Click the game to focus controls. Press <strong>F</strong> for fullscreen.</p>
+      <div id="game-container"></div>
+    </main>
+    <script>
+      (function () {
+        var container = document.getElementById("game-container");
+        var script = document.createElement("script");
+        script.src = "player.js?g=sporeline.love&v=11.5&n=1";
+        script.async = true;
+        script.onerror = function () {
+          container.innerHTML =
+            '<div class="error">Missing <code>player.js</code>. Run <code>make fetch-lovejs && make web</code>.</div>';
+        };
+        container.appendChild(script);
+      })();
+    </script>
+  </body>
+</html>

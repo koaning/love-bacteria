@@ -1,1 +1,5 @@
 dist/
+.DS_Store
+assets/audio/music/demos/
+web/lovejs/*
+!web/lovejs/README.md
