@@ -221,7 +221,7 @@ function Tests.play_transition_advances_during_gameplay()
   assert_equal(game.play_transition, 1, "Gameplay transition should cap at full visibility")
 end
 
-function Tests.start_game_intro_fades_menu_music_before_game_track()
+function Tests.start_game_intro_keeps_shared_music_running_until_game_cue()
   local game = Game.new()
   local audio_spy = make_audio_spy(false)
   local initial_context_calls = 0
@@ -232,7 +232,7 @@ function Tests.start_game_intro_fades_menu_music_before_game_track()
 
   game:start_game(7, "hard")
 
-  assert_equal(game.audio.target_music_calls[#game.audio.target_music_calls], "__none__", "Start game should fade out menu music first")
+  assert_equal(#game.audio.target_music_calls, 0, "Shared music should keep running during intro")
   assert_equal(#game.audio.context_calls, initial_context_calls, "Game music should not start immediately when intro begins")
 
   game:update(0.45)

@@ -15,7 +15,7 @@
   - visible audio status in UI
 - [ ] Add separate SFX / music volume controls.
 - [x] Add background music support:
-  - load a looping menu track and gameplay track from `assets/audio/`
+  - load a looping gameplay track from `assets/audio/` and reuse it across menus/matches
   - fade between tracks on screen change
   - obey mute/volume settings
 

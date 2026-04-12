@@ -76,8 +76,8 @@ This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `di
 - `src/ai.lua` contains enemy move selection logic for easy/medium/hard difficulties.
 - `src/render.lua` draws the board, HUD, highlights, and end-game overlay.
 - `src/input.lua` handles simple mouse and keyboard helpers.
-- `src/audio.lua` manages SFX, mute state, and menu/game music track fading.
-- `assets/audio/` (optional) can provide custom `sfx/*.ogg` and `music/{menu,game}.ogg` files.
+- `src/audio.lua` manages SFX, mute state, and shared background music fading.
+- `assets/audio/` (optional) can provide custom `sfx/*.ogg` and `music/game.ogg` files.
 - `src/level.lua` defines the starting layout for the chosen board size.
 - `src/game.lua` coordinates turn flow and AI timing.
 - `assets/fonts/` contains bundled UI fonts used for title/body typography.

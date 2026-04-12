@@ -516,14 +516,6 @@ function Game:start_opening_scene()
     music_delay = OPENING_SCENE_MUSIC_DELAY,
     music_started = false,
   }
-
-  if self.audio and self.audio.set_target_music then
-    self.audio:set_target_music(nil)
-    return
-  end
-
-  self.audio:set_context("game")
-  self.opening_scene.music_started = true
 end
 
 function Game:clear_opening_scene()

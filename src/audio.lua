@@ -174,27 +174,6 @@ local function create_dual_tone_source(low_frequency, high_frequency, duration, 
   return love.audio.newSource(sound_data, "static")
 end
 
-local function create_music_loop_source(frequency_a, frequency_b, duration, gain)
-  local sample_count = math.max(1, math.floor(duration * SAMPLE_RATE))
-  local sound_data = love.sound.newSoundData(sample_count, SAMPLE_RATE, 16, 1)
-
-  for index = 0, sample_count - 1 do
-    local t = index / SAMPLE_RATE
-    local drift = (math.sin((2 * math.pi * 0.061) * t) + 1) * 0.5
-    local pulse = 0.78 + (((math.sin((2 * math.pi * 0.147) * t) + 1) * 0.5) * 0.16)
-    local a = math.sin((2 * math.pi * (frequency_a + (drift * 2.0))) * t) * 0.58
-    local b = math.sin((2 * math.pi * frequency_b) * t) * 0.42
-    local shimmer = math.sin((2 * math.pi * (frequency_b * 1.5)) * t) * 0.10
-    local sample = (a + b + shimmer) * 0.25 * pulse * gain
-
-    sound_data:setSample(index, clamp(sample, -1, 1))
-  end
-
-  local source = love.audio.newSource(sound_data, "static")
-  safe_set_looping(source, true)
-  return source
-end
-
 local function semitone_ratio(semitones)
   return 2 ^ (semitones / 12)
 end
@@ -361,11 +340,6 @@ function Audio.new()
       "assets/audio/sfx/tie.wav",
     }, "static") or create_dual_tone_source(330, 330, 0.14, 0.28)
 
-    self.music_tracks.menu = load_first_source({
-      "assets/audio/music/menu.ogg",
-      "assets/audio/music/menu.wav",
-    }, "stream") or create_music_loop_source(214, 320, 8.0, 0.95)
-
     self.music_tracks.game = load_first_source({
       "assets/audio/music/game.ogg",
       "assets/audio/music/game.wav",
@@ -474,7 +448,7 @@ function Audio:set_context(next_context)
   self.context = next_context
 
   if next_context == "menu" then
-    self:set_target_music("menu")
+    self:set_target_music("game")
     self:play("menu_open")
     return
   end
