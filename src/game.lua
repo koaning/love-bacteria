@@ -602,7 +602,14 @@ function Game:toggle_fullscreen()
   end
 
   local is_fullscreen = love.window.getFullscreen()
-  local ok = pcall(love.window.setFullscreen, not is_fullscreen, "desktop")
+  local is_web = love.system and love.system.getOS and love.system.getOS() == "Web"
+  local ok = false
+
+  if is_web then
+    ok = pcall(love.window.setFullscreen, not is_fullscreen)
+  else
+    ok = pcall(love.window.setFullscreen, not is_fullscreen, "desktop")
+  end
 
   if not ok then
     pcall(love.window.setFullscreen, not is_fullscreen)
