@@ -38,8 +38,9 @@ love: | $(DIST_DIR)
 	rm -f "$(LOVE_ARCHIVE)"
 	zip -9 -r "$(LOVE_ARCHIVE)" . \
 		-x ".git" ".git/*" ".gitkeep" ".context/*" "dist/*" ".github/*" "tests/*" \
-		-x "Makefile" "README.md" "*.DS_Store" "web/*" "assets/audio/music/demos/*" \
-		-x "build/*" "docs/*"
+		-x "Makefile" "README.md" "STEAMDECK.md" "*.DS_Store" \
+		-x "web/*" "assets/audio/music/demos/*" \
+		-x "build/*" "scripts/*"
 
 build: love
 ifeq ($(UNAME_S),Darwin)

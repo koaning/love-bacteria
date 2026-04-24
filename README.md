@@ -44,7 +44,7 @@ This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `di
 Sporeline runs on Steam Deck as a Non-Steam game via a Linux AppImage. Native gamepad support is built in (D-pad + ABXY + shoulders + Start), so the Deck's controls work with no Steam Input remapping.
 
 - Build the AppImage: push a git tag (CI attaches `Sporeline-x86_64.AppImage` to the release) or run `make appimage` on a Linux host.
-- Full walkthrough — produce, transfer, add to Steam, set custom library artwork — is in [`docs/steam-deck.md`](docs/steam-deck.md).
+- Full walkthrough — one-time Deck setup over SSH, install script, and future updates from your Mac — is in [STEAMDECK.md](STEAMDECK.md).
 
 ## Web Build (Playable Embed)
 
