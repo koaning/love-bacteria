@@ -27,3 +27,7 @@ end
 function love.keypressed(key)
   game:keypressed(key)
 end
+
+function love.gamepadpressed(joystick, button)
+  game:gamepadpressed(joystick, button)
+end

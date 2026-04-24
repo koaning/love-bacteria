@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Sporeline
+Comment=A LÖVE 2D strategy game inspired by the bacteria puzzle from The 7th Guest
+Exec=AppRun
+Icon=sporeline
+Terminal=false
+Categories=Game;StrategyGame;

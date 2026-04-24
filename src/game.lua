@@ -1278,17 +1278,104 @@ function Game:keypressed(key)
   end
 
   if input.is_quit_key(key) then
-    self:set_screen("main_menu")
-    self.state = nil
-    self.piece_animations = {}
-    self.move_animation = nil
-    self.screen_shake.x = 0
-    self.screen_shake.y = 0
-    self.screen_shake.elapsed = 0
-    self.screen_shake.duration = 0
-    self.screen_shake.amplitude = 0
-    self.ai_timer = 0
-    self.cursor_cell = nil
+    self:leave_playing_screen()
+  end
+end
+
+function Game:leave_playing_screen()
+  self:set_screen("main_menu")
+  self.state = nil
+  self.piece_animations = {}
+  self.move_animation = nil
+  self.screen_shake.x = 0
+  self.screen_shake.y = 0
+  self.screen_shake.elapsed = 0
+  self.screen_shake.duration = 0
+  self.screen_shake.amplitude = 0
+  self.ai_timer = 0
+  self.cursor_cell = nil
+end
+
+function Game:gamepadpressed(_joystick, button)
+  if input.is_gamepad_settings(button) and (self.screen == "main_menu" or self.screen == "play_menu") then
+    self:toggle_settings_visibility()
+    return
+  end
+
+  if input.is_gamepad_mute(button) and self:can_toggle_mute() then
+    self:toggle_mute()
+    return
+  end
+
+  local dx, dy = input.gamepad_direction(button)
+
+  if self.screen == "main_menu" then
+    if dx then
+      if dx == 0 and dy == -1 then
+        self:move_menu_focus("up")
+      elseif dx == 0 and dy == 1 then
+        self:move_menu_focus("down")
+      elseif dx == -1 then
+        self:move_menu_focus("left")
+      elseif dx == 1 then
+        self:move_menu_focus("right")
+      end
+      return
+    end
+
+    if input.is_gamepad_confirm(button) then
+      self:activate_focused_menu_button()
+      return
+    end
+
+    if input.is_gamepad_back(button) then
+      love.event.quit()
+    end
+    return
+  end
+
+  if self.screen == "play_menu" then
+    if dx then
+      if dx == 0 and dy == -1 then
+        self:move_menu_focus("up")
+      elseif dx == 0 and dy == 1 then
+        self:move_menu_focus("down")
+      elseif dx == -1 then
+        self:move_menu_focus("left")
+      elseif dx == 1 then
+        self:move_menu_focus("right")
+      end
+      return
+    end
+
+    if input.is_gamepad_confirm(button) then
+      self:activate_focused_menu_button()
+      return
+    end
+
+    if input.is_gamepad_back(button) then
+      self:set_screen("main_menu")
+    end
+    return
+  end
+
+  if dx then
+    self:move_cursor(dx, dy)
+    return
+  end
+
+  if input.is_gamepad_confirm(button) then
+    self:activate_cursor_cell()
+    return
+  end
+
+  if input.is_gamepad_restart(button) then
+    self:restart()
+    return
+  end
+
+  if input.is_gamepad_back(button) then
+    self:leave_playing_screen()
   end
 end
 

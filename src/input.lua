@@ -24,6 +24,46 @@ function Input.is_toggle_settings_key(key)
   return key == "tab"
 end
 
+function Input.gamepad_direction(button)
+  if button == "dpup" then
+    return 0, -1
+  end
+
+  if button == "dpdown" then
+    return 0, 1
+  end
+
+  if button == "dpleft" then
+    return -1, 0
+  end
+
+  if button == "dpright" then
+    return 1, 0
+  end
+
+  return nil
+end
+
+function Input.is_gamepad_confirm(button)
+  return button == "a"
+end
+
+function Input.is_gamepad_back(button)
+  return button == "b" or button == "start"
+end
+
+function Input.is_gamepad_mute(button)
+  return button == "x"
+end
+
+function Input.is_gamepad_restart(button)
+  return button == "y"
+end
+
+function Input.is_gamepad_settings(button)
+  return button == "leftshoulder" or button == "rightshoulder" or button == "back"
+end
+
 function Input.screen_to_cell(layout, x, y)
   local local_x = x - layout.origin_x
   local local_y = y - layout.origin_y
