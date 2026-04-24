@@ -1,0 +1,40 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  appimage:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y luajit zip curl file
+
+      - name: Run tests
+        run: luajit tests/run.lua
+
+      - name: Build Linux AppImage
+        run: make appimage
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sporeline-x86_64.AppImage
+          path: dist/Sporeline-x86_64.AppImage
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Sporeline-x86_64.AppImage

@@ -450,6 +450,42 @@ function Tests.fullscreen_hotkeys_toggle_window_mode()
   end
 end
 
+function Tests.gamepad_dpad_moves_cursor_and_a_button_acts()
+  local game = Game.new()
+  game:start_game(7, "hard")
+
+  assert_equal(game.cursor_cell.x, 1, "Cursor should start on first player piece")
+  assert_equal(game.cursor_cell.y, 1, "Cursor should start on first player piece")
+
+  game:gamepadpressed(nil, "a")
+  assert_equal(game.state.selected_cell.x, 1, "A button should select piece at cursor")
+  assert_equal(game.state.selected_cell.y, 1, "A button should select piece at cursor")
+
+  game:gamepadpressed(nil, "dpright")
+  assert_equal(game.cursor_cell.x, 2, "D-pad right should move cursor")
+
+  game:gamepadpressed(nil, "a")
+  assert_equal(board.get_cell(game.state, 2, 1), "player", "A button should commit move from selected piece")
+  assert_equal(game.state.current_player, "enemy", "After move it should become enemy turn")
+end
+
+function Tests.gamepad_main_menu_a_button_opens_play_menu()
+  local game = Game.new()
+
+  game:gamepadpressed(nil, "a")
+  assert_equal(game.screen, "play_menu", "A button on main menu should activate focused Play button")
+end
+
+function Tests.gamepad_b_button_returns_to_main_menu_from_playing()
+  local game = Game.new()
+  game:start_game(7, "hard")
+  assert_equal(game.screen, "playing")
+
+  game:gamepadpressed(nil, "b")
+  assert_equal(game.screen, "main_menu", "B button should leave playing screen")
+  assert_equal(game.state, nil, "Leaving playing should clear state")
+end
+
 function Tests.playing_keyboard_cursor_can_select_and_move()
   local game = Game.new()
   game:start_game(7, "hard")

@@ -39,6 +39,13 @@ make build
 
 This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `dist/Sporeline.app`.
 
+## Steam Deck
+
+Sporeline runs on Steam Deck as a Non-Steam game via a Linux AppImage. Native gamepad support is built in (D-pad + ABXY + shoulders + Start), so the Deck's controls work with no Steam Input remapping.
+
+- Build the AppImage: push a git tag (CI attaches `Sporeline-x86_64.AppImage` to the release) or run `make appimage` on a Linux host.
+- Full walkthrough — produce, transfer, add to Steam, set custom library artwork — is in [`docs/steam-deck.md`](docs/steam-deck.md).
+
 ## Web Build (Playable Embed)
 
 To prepare a browser-playable build:
@@ -94,6 +101,7 @@ python3 -m http.server 8000
 - Play menu keyboard: `5`/`7`/`9` choose board size, `E`/`M`/`H` choose bot difficulty, `Esc` goes back.
 - `Tab` shows/hides the menu settings row.
 - Menus include a settings row for `Fullscreen`, `Mute`, and `SFX/Music` volume (`+/-`) via mouse click.
+- Gamepad: D-pad navigates, `A` confirms, `B` goes back, `X` toggles mute, `Y` restarts, shoulder buttons toggle the settings row.
 - Left click one of your bacteria to select it.
 - Left click a highlighted cell to move.
 - In game keyboard: `Arrow keys` move the cursor, `Enter`/`Space` select and move.
