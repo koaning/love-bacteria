@@ -3,6 +3,10 @@ local rules = require("src.rules")
 
 local AI = {}
 
+local HARD_SEARCH_DEPTH = 2
+local INFINITY = math.huge
+local WIN_SCORE = 100000
+
 local function other_side(side)
   if side == "player" then
     return "enemy"
@@ -47,6 +51,31 @@ local function compare_moves(candidate_move, candidate_score, best_move, best_sc
   return candidate_move.from.x < best_move.from.x
 end
 
+local function evaluate_state(state, perspective)
+  local opponent = other_side(perspective)
+
+  if state.winner == perspective then
+    return WIN_SCORE
+  end
+
+  if state.winner == opponent then
+    return -WIN_SCORE
+  end
+
+  if state.winner == "tie" then
+    return 0
+  end
+
+  local my_count = board.count_cells(state, perspective)
+  local their_count = board.count_cells(state, opponent)
+  local my_moves = #rules.get_legal_moves(state, perspective)
+  local their_moves = #rules.get_legal_moves(state, opponent)
+
+  return ((my_count - their_count) * 8)
+    + (my_moves * 5)
+    - (their_moves * 6)
+end
+
 local function score_move(state, side, move)
   local opponent = other_side(side)
   local simulated = rules.resolve_state(rules.apply_move(state, move))
@@ -57,11 +86,11 @@ local function score_move(state, side, move)
   end
 
   if simulated.winner == side then
-    return 100000 + converted
+    return WIN_SCORE + converted
   end
 
   if simulated.winner == opponent then
-    return -100000
+    return -WIN_SCORE
   end
 
   local my_count = board.count_cells(simulated, side)
@@ -100,6 +129,80 @@ local function choose_best_move(state, side, legal_moves)
   return best_move
 end
 
+local function minimax_score(state, perspective, depth, alpha, beta)
+  if state.winner or depth == 0 then
+    return evaluate_state(state, perspective)
+  end
+
+  local current_side = state.current_player
+  local legal_moves = rules.get_legal_moves(state, current_side)
+
+  if #legal_moves == 0 then
+    return evaluate_state(state, perspective)
+  end
+
+  if current_side == perspective then
+    local best = -INFINITY
+
+    for _, move in ipairs(legal_moves) do
+      local next_state = rules.resolve_state(rules.apply_move(state, move))
+      local score = minimax_score(next_state, perspective, depth - 1, alpha, beta)
+
+      if score > best then
+        best = score
+      end
+
+      if best > alpha then
+        alpha = best
+      end
+
+      if alpha >= beta then
+        break
+      end
+    end
+
+    return best
+  end
+
+  local best = INFINITY
+
+  for _, move in ipairs(legal_moves) do
+    local next_state = rules.resolve_state(rules.apply_move(state, move))
+    local score = minimax_score(next_state, perspective, depth - 1, alpha, beta)
+
+    if score < best then
+      best = score
+    end
+
+    if best < beta then
+      beta = best
+    end
+
+    if alpha >= beta then
+      break
+    end
+  end
+
+  return best
+end
+
+local function choose_lookahead_move(state, side, legal_moves, depth)
+  local best_move = nil
+  local best_score = nil
+
+  for _, move in ipairs(legal_moves) do
+    local next_state = rules.resolve_state(rules.apply_move(state, move))
+    local score = minimax_score(next_state, side, depth - 1, -INFINITY, INFINITY)
+
+    if compare_moves(move, score, best_move, best_score) then
+      best_move = move
+      best_score = score
+    end
+  end
+
+  return best_move
+end
+
 function AI.choose_move(state, side, difficulty)
   local legal_moves = rules.get_legal_moves(state, side)
   local bot_difficulty = difficulty or "hard"
@@ -124,9 +227,9 @@ function AI.choose_move(state, side, difficulty)
     return legal_moves[random_index(#legal_moves)]
   end
 
-  local best_move = choose_best_move(state, side, legal_moves)
-
   if bot_difficulty == "medium" then
+    local best_move = choose_best_move(state, side, legal_moves)
+
     if random_index(3) == 1 then
       return legal_moves[random_index(#legal_moves)]
     end
@@ -134,7 +237,7 @@ function AI.choose_move(state, side, difficulty)
     return best_move
   end
 
-  return best_move
+  return choose_lookahead_move(state, side, legal_moves, HARD_SEARCH_DEPTH)
 end
 
 return AI
