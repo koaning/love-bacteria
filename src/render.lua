@@ -190,6 +190,101 @@ local function draw_button(button, active, focused, hovered, pulse_time, y_offse
   )
 end
 
+local function get_hovered_rect_id(rects)
+  if not love or not love.mouse or not love.mouse.getPosition then
+    return nil
+  end
+
+  local x, y = love.mouse.getPosition()
+
+  for _, rect in ipairs(rects) do
+    if point_in_rect(x, y, rect) then
+      return rect.id
+    end
+  end
+
+  return nil
+end
+
+local function draw_cycler_arrow(rect, label, focused, hovered, pulse_time, y_offset, alpha_multiplier)
+  draw_button(
+    { id = rect.id, label = label, x = rect.x, y = rect.y, width = rect.width, height = rect.height },
+    false,
+    focused,
+    hovered,
+    pulse_time,
+    y_offset,
+    alpha_multiplier
+  )
+end
+
+local function draw_cycler_row(row, row_focused, hovered_zone, pulse_time, y_offset, alpha_multiplier)
+  local label_rect = row.label_rect
+  local value_rect = row.value_rect
+  local pulse = (math.sin((pulse_time or 0) * 5.5) + 1) * 0.5
+
+  love.graphics.setFont(fonts.section)
+  set_color(palette.text_muted, alpha_multiplier)
+  love.graphics.print(
+    row.label,
+    label_rect.x,
+    label_rect.y + math.floor((label_rect.height - fonts.section:getHeight()) * 0.5) + y_offset
+  )
+
+  local emphasize = 0
+  if row_focused then
+    emphasize = 0.03 + (pulse * 0.06)
+  end
+
+  local fill = palette.cell
+  local edge = palette.cell_edge
+  local scale = 1 + (emphasize * 0.20)
+  local draw_width = value_rect.width * scale
+  local draw_height = value_rect.height * scale
+  local draw_x = value_rect.x + ((value_rect.width - draw_width) * 0.5)
+  local draw_y = value_rect.y + y_offset + ((value_rect.height - draw_height) * 0.5)
+
+  set_color(tint(fill, emphasize), alpha_multiplier)
+  love.graphics.rectangle("fill", draw_x, draw_y, draw_width, draw_height, 12, 12)
+  set_color(tint(edge, emphasize * 0.5), alpha_multiplier)
+  love.graphics.setLineWidth(row_focused and 3 or 2)
+  love.graphics.rectangle("line", draw_x, draw_y, draw_width, draw_height, 12, 12)
+  if row_focused then
+    set_color(palette.selected, alpha_multiplier)
+    love.graphics.rectangle("line", draw_x + 4, draw_y + 4, draw_width - 8, draw_height - 8, 10, 10)
+  end
+  love.graphics.setLineWidth(1)
+
+  love.graphics.setFont(fonts.button)
+  set_color(palette.text, alpha_multiplier)
+  love.graphics.printf(
+    row.value_text or "",
+    draw_x,
+    draw_y + math.floor((draw_height - fonts.button:getHeight()) * 0.5),
+    draw_width,
+    "center"
+  )
+
+  draw_cycler_arrow(
+    { id = row.id .. "_left", x = row.left_rect.x, y = row.left_rect.y, width = row.left_rect.width, height = row.left_rect.height },
+    "<",
+    row_focused,
+    hovered_zone == "left",
+    pulse_time,
+    y_offset,
+    alpha_multiplier
+  )
+  draw_cycler_arrow(
+    { id = row.id .. "_right", x = row.right_rect.x, y = row.right_rect.y, width = row.right_rect.width, height = row.right_rect.height },
+    ">",
+    row_focused,
+    hovered_zone == "right",
+    pulse_time,
+    y_offset,
+    alpha_multiplier
+  )
+end
+
 local function draw_audio_status_badge(width, height, audio_status, alpha_multiplier, y_position)
   if not audio_status then
     return
@@ -765,17 +860,111 @@ function Render.get_main_menu_ui(width, height)
   }
 end
 
-function Render.get_play_menu_ui(width, height)
+local DIFFICULTY_LABELS = { easy = "Easy", medium = "Medium", hard = "Hard" }
+
+local function size_value_text(size)
+  local n = size or 7
+  return tostring(n) .. "x" .. tostring(n)
+end
+
+local function difficulty_value_text(difficulty)
+  return DIFFICULTY_LABELS[difficulty or "hard"] or "Hard"
+end
+
+function Render.get_play_menu_ui(width, height, view)
+  view = view or {}
+
   local panel_width = 520
   local panel_height = 410
   local panel_x = math.floor((width - panel_width) * 0.5)
   local panel_y = math.floor((height - panel_height) * 0.5)
-  local option_width = 120
-  local option_height = 54
-  local gap = 20
-  local row_width = (option_width * 3) + (gap * 2)
-  local options_x = panel_x + math.floor((panel_width - row_width) * 0.5)
-  local options_y = panel_y + 116
+
+  local content_inset = 30
+  local content_x = panel_x + content_inset
+  local content_width = panel_width - (content_inset * 2)
+
+  local row_height = 60
+  local row_gap = 18
+  local arrow_size = 44
+  local value_width = 110
+  local controls_gap = 10
+  local controls_block_width = arrow_size + controls_gap + value_width + controls_gap + arrow_size
+  local controls_right = content_x + content_width
+  local controls_left = controls_right - controls_block_width
+
+  local function build_cycler(id, label, value_text, row_y)
+    local left_rect = {
+      x = controls_left,
+      y = row_y + math.floor((row_height - arrow_size) * 0.5),
+      width = arrow_size,
+      height = arrow_size,
+    }
+    local value_rect = {
+      x = controls_left + arrow_size + controls_gap,
+      y = row_y + math.floor((row_height - arrow_size) * 0.5),
+      width = value_width,
+      height = arrow_size,
+    }
+    local right_rect = {
+      x = controls_left + arrow_size + controls_gap + value_width + controls_gap,
+      y = row_y + math.floor((row_height - arrow_size) * 0.5),
+      width = arrow_size,
+      height = arrow_size,
+    }
+    local label_rect = {
+      x = content_x,
+      y = row_y,
+      width = controls_left - content_x - 10,
+      height = row_height,
+    }
+
+    return {
+      id = id,
+      kind = "cycler",
+      label = label,
+      value_text = value_text,
+      row_rect = { x = content_x, y = row_y, width = content_width, height = row_height },
+      label_rect = label_rect,
+      left_rect = left_rect,
+      value_rect = value_rect,
+      right_rect = right_rect,
+    }
+  end
+
+  local cyclers_top = panel_y + 130
+  local size_row = build_cycler("size", "Board Size", size_value_text(view.board_size), cyclers_top)
+  local difficulty_row = build_cycler(
+    "difficulty",
+    "Bot Difficulty",
+    difficulty_value_text(view.difficulty),
+    cyclers_top + row_height + row_gap
+  )
+
+  local action_button_width = 180
+  local action_button_height = 50
+  local actions_y = panel_y + 334
+  local actions_row = {
+    id = "actions",
+    kind = "button_pair",
+    buttons = {
+      {
+        id = "back",
+        label = "Back",
+        x = panel_x + 56,
+        y = actions_y,
+        width = action_button_width,
+        height = action_button_height,
+      },
+      {
+        id = "start",
+        label = "Start",
+        x = panel_x + panel_width - action_button_width - 56,
+        y = actions_y,
+        width = action_button_width,
+        height = action_button_height,
+      },
+    },
+  }
 
   return {
     panel = {
@@ -792,72 +981,7 @@ function Render.get_play_menu_ui(width, height)
       { id = "music_down", x = math.floor((width - 640) * 0.5) + 438, y = height - 62, width = 96, height = 42 },
       { id = "music_up", x = math.floor((width - 640) * 0.5) + 544, y = height - 62, width = 96, height = 42 },
     },
-    buttons = {
-      {
-        id = "size_5",
-        label = "5x5",
-        x = options_x,
-        y = options_y,
-        width = option_width,
-        height = option_height,
-      },
-      {
-        id = "size_7",
-        label = "7x7",
-        x = options_x + option_width + gap,
-        y = options_y,
-        width = option_width,
-        height = option_height,
-      },
-      {
-        id = "size_9",
-        label = "9x9",
-        x = options_x + ((option_width + gap) * 2),
-        y = options_y,
-        width = option_width,
-        height = option_height,
-      },
-      {
-        id = "difficulty_easy",
-        label = "Easy",
-        x = options_x,
-        y = panel_y + 246,
-        width = option_width,
-        height = 50,
-      },
-      {
-        id = "difficulty_medium",
-        label = "Medium",
-        x = options_x + option_width + gap,
-        y = panel_y + 246,
-        width = option_width,
-        height = 50,
-      },
-      {
-        id = "difficulty_hard",
-        label = "Hard",
-        x = options_x + ((option_width + gap) * 2),
-        y = panel_y + 246,
-        width = option_width,
-        height = 50,
-      },
-      {
-        id = "back",
-        label = "Back",
-        x = panel_x + 56,
-        y = panel_y + 334,
-        width = 180,
-        height = 50,
-      },
-      {
-        id = "start",
-        label = "Start",
-        x = panel_x + panel_width - 236,
-        y = panel_y + 334,
-        width = 180,
-        height = 50,
-      },
-    },
+    rows = { size_row, difficulty_row, actions_row },
   }
 end
 
@@ -940,12 +1064,16 @@ function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time, a
   end
 end
 
-function Render.draw_play_menu(selected_size, selected_difficulty, focused_button_id, menu_transition, pulse_time, audio_status, settings_visible)
+function Render.draw_play_menu(selected_size, selected_difficulty, focus, menu_transition, pulse_time, audio_status, settings_visible)
   local width, height = love.graphics.getDimensions()
-  local ui = Render.get_play_menu_ui(width, height)
+  local ui = Render.get_play_menu_ui(width, height, {
+    board_size = selected_size,
+    difficulty = selected_difficulty,
+  })
   local transition = clamp(menu_transition or 1, 0, 1)
   local y_offset = math.floor((1 - transition) * 18)
-  local hovered_id = get_hovered_button_id(ui.buttons)
+  local focus_row = focus and focus.row or nil
+  local focus_action = focus and focus.action or "start"
 
   refresh_fonts_for_size(width, height)
   draw_background(width, height)
@@ -956,37 +1084,30 @@ function Render.draw_play_menu(selected_size, selected_difficulty, focused_butto
   love.graphics.printf("Play", ui.panel.x, ui.panel.y + 30 + y_offset, ui.panel.width, "center")
   draw_audio_status_badge(width, height, audio_status, transition, 18)
 
-  love.graphics.setFont(fonts.section)
-  set_color(palette.text_muted, transition)
-  love.graphics.printf("Board Size", ui.panel.x, ui.panel.y + 88 + y_offset, ui.panel.width, "center")
-  love.graphics.printf("Bot Difficulty", ui.panel.x, ui.panel.y + 218 + y_offset, ui.panel.width, "center")
-
-  for _, button in ipairs(ui.buttons) do
-    local active = false
-
-    if button.id == "size_5" then
-      active = selected_size == 5
-    elseif button.id == "size_7" then
-      active = selected_size == 7
-    elseif button.id == "size_9" then
-      active = selected_size == 9
-    elseif button.id == "difficulty_easy" then
-      active = selected_difficulty == "easy"
-    elseif button.id == "difficulty_medium" then
-      active = selected_difficulty == "medium"
-    elseif button.id == "difficulty_hard" then
-      active = selected_difficulty == "hard"
+  for _, row in ipairs(ui.rows) do
+    if row.kind == "cycler" then
+      local hover_zone = nil
+      local hover_id = get_hovered_rect_id({
+        { id = "left", x = row.left_rect.x, y = row.left_rect.y, width = row.left_rect.width, height = row.left_rect.height },
+        { id = "right", x = row.right_rect.x, y = row.right_rect.y, width = row.right_rect.width, height = row.right_rect.height },
+      })
+      hover_zone = hover_id
+      draw_cycler_row(row, row.id == focus_row, hover_zone, pulse_time, y_offset, transition)
+    elseif row.kind == "button_pair" then
+      local hovered_id = get_hovered_button_id(row.buttons)
+      for _, button in ipairs(row.buttons) do
+        local is_focused = focus_row == "actions" and button.id == focus_action
+        draw_button(
+          button,
+          false,
+          is_focused,
+          button.id == hovered_id,
+          pulse_time,
+          y_offset,
+          transition
+        )
+      end
     end
-
-    draw_button(
-      button,
-      active,
-      button.id == focused_button_id,
-      button.id == hovered_id,
-      pulse_time,
-      y_offset,
-      transition
-    )
   end
 
   draw_settings_toggle_hint(width, height, settings_visible, transition)
