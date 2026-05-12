@@ -22,6 +22,7 @@ local OPENING_SCENE_MUSIC_DELAY = 0.60
 local SETTINGS_VOLUME_STEP = 0.05
 local CURSOR_REPEAT_DELAY = 0.22
 local CURSOR_REPEAT_INTERVAL = 0.07
+local AI_HISTORY_LIMIT = 8
 
 local MAIN_MENU_FOCUS = {
   play = { up = "quit", down = "quit", left = "quit", right = "quit" },
@@ -171,6 +172,7 @@ function Game.new()
   self.menu_focus_index = nil
   self.play_menu_focus = { row = "size", action = "start" }
   self.settings_visible = false
+  self.ai_history = {}
   self.screen = nil
   self:set_screen("main_menu")
 
@@ -234,6 +236,7 @@ function Game:start_game(board_size, bot_difficulty)
   self.selected_bot_difficulty = difficulty
   self.board_size = size
   self.bot_difficulty = difficulty
+  self.ai_history = {}
   local next_state = rules.resolve_state(level.load(size))
   self:set_state(next_state, false)
   self:set_screen("playing", { with_intro = with_intro })
@@ -252,6 +255,7 @@ function Game:restart()
     return
   end
 
+  self.ai_history = {}
   local next_state = rules.resolve_state(level.load(self.board_size))
   self:set_state(next_state, false)
   self.ai_timer = 0
@@ -306,10 +310,28 @@ function Game:trigger_screen_shake(amplitude, duration)
   self.screen_shake.elapsed = 0
 end
 
+function Game:record_ai_history(state)
+  if not state then
+    return
+  end
+
+  local hash = ai.state_hash(state)
+  if not hash then
+    return
+  end
+
+  self.ai_history[#self.ai_history + 1] = hash
+
+  while #self.ai_history > AI_HISTORY_LIMIT do
+    table.remove(self.ai_history, 1)
+  end
+end
+
 function Game:commit_move(move)
   local moving_side = self.state and self.state.current_player
   local next_state = rules.resolve_state(rules.apply_move(self.state, move))
   self:set_state(next_state, self.state)
+  self:record_ai_history(next_state)
   self.ai_timer = 0
 
   if moving_side == "player" then
@@ -1048,7 +1070,7 @@ function Game:run_enemy_turn()
     return
   end
 
-  local move = ai.choose_move(self.state, "enemy", self.bot_difficulty)
+  local move = ai.choose_move(self.state, "enemy", self.bot_difficulty, self.ai_history)
 
   if not move then
     local next_state = rules.resolve_state(self.state)

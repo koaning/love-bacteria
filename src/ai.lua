@@ -7,6 +7,69 @@ local HARD_SEARCH_DEPTH = 2
 local INFINITY = math.huge
 local WIN_SCORE = 100000
 
+function AI.state_hash(state)
+  if not state then
+    return nil
+  end
+
+  local parts = {}
+
+  for y = 1, state.height do
+    for x = 1, state.width do
+      local cell = board.get_cell(state, x, y)
+
+      if cell == "player" then
+        parts[#parts + 1] = "P"
+      elseif cell == "enemy" then
+        parts[#parts + 1] = "E"
+      else
+        parts[#parts + 1] = "."
+      end
+    end
+  end
+
+  parts[#parts + 1] = ":"
+  parts[#parts + 1] = state.current_player or "?"
+
+  return table.concat(parts)
+end
+
+local function hash_in_history(history, hash)
+  if not history then
+    return false
+  end
+
+  for _, entry in ipairs(history) do
+    if entry == hash then
+      return true
+    end
+  end
+
+  return false
+end
+
+local function filter_non_repeating(state, legal_moves, history)
+  if not history or #history == 0 then
+    return legal_moves
+  end
+
+  local kept = {}
+
+  for _, move in ipairs(legal_moves) do
+    local next_state = rules.resolve_state(rules.apply_move(state, move))
+
+    if not hash_in_history(history, AI.state_hash(next_state)) then
+      kept[#kept + 1] = move
+    end
+  end
+
+  if #kept == 0 then
+    return legal_moves
+  end
+
+  return kept
+end
+
 local function other_side(side)
   if side == "player" then
     return "enemy"
@@ -203,13 +266,15 @@ local function choose_lookahead_move(state, side, legal_moves, depth)
   return best_move
 end
 
-function AI.choose_move(state, side, difficulty)
+function AI.choose_move(state, side, difficulty, history)
   local legal_moves = rules.get_legal_moves(state, side)
   local bot_difficulty = difficulty or "hard"
 
   if #legal_moves == 0 then
     return nil
   end
+
+  legal_moves = filter_non_repeating(state, legal_moves, history)
 
   if bot_difficulty == "easy" then
     local grow_moves = {}

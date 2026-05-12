@@ -204,6 +204,42 @@ function Tests.hard_bot_looks_beyond_one_ply()
   assert_equal(move_matches(greedy, hard), false, "Hard bot must look past one ply on this position")
 end
 
+function Tests.hard_bot_avoids_states_in_history()
+  -- On the default 7x7 opening, capture Hard's preferred enemy move.
+  -- Then ask again with that move's resulting state hashed into history.
+  -- Hard must pick a different move to break the loop.
+  local state = level.load(7)
+  state.current_player = "enemy"
+
+  local first_move = ai.choose_move(state, "enemy", "hard")
+  assert_truthy(first_move, "Hard should return a move on the opening position")
+
+  local resulting_state = rules.resolve_state(rules.apply_move(state, first_move))
+  local history = { ai.state_hash(resulting_state) }
+
+  local second_move = ai.choose_move(state, "enemy", "hard", history)
+  assert_truthy(second_move, "Hard should still return a move when first choice is blocked by history")
+  assert_equal(move_matches(first_move, second_move), false,
+    "Hard must avoid producing a state already in history")
+end
+
+function Tests.bot_falls_back_when_every_move_repeats_history()
+  -- If every legal move produces a state already in history, the AI must
+  -- still return one of them (forced repeat) rather than nil.
+  local state = level.load(7)
+  state.current_player = "enemy"
+
+  local legal_moves = rules.get_legal_moves(state, "enemy")
+  local history = {}
+  for _, move in ipairs(legal_moves) do
+    local resulting_state = rules.resolve_state(rules.apply_move(state, move))
+    history[#history + 1] = ai.state_hash(resulting_state)
+  end
+
+  local move = ai.choose_move(state, "enemy", "hard", history)
+  assert_truthy(move, "AI must fall back to a legal move when history blocks every alternative")
+end
+
 function Tests.choose_move_returns_nil_without_legal_moves()
   local state = board.new_state(3, 3)
 
