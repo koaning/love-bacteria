@@ -22,22 +22,31 @@ local OPENING_SCENE_MUSIC_DELAY = 0.60
 local SETTINGS_VOLUME_STEP = 0.05
 local CURSOR_REPEAT_DELAY = 0.22
 local CURSOR_REPEAT_INTERVAL = 0.07
+local AI_HISTORY_LIMIT = 8
 
 local MAIN_MENU_FOCUS = {
   play = { up = "quit", down = "quit", left = "quit", right = "quit" },
   quit = { up = "play", down = "play", left = "play", right = "play" },
 }
 
-local PLAY_MENU_FOCUS = {
-  size_5 = { up = "back", down = "difficulty_easy", left = "size_9", right = "size_7" },
-  size_7 = { up = "start", down = "difficulty_medium", left = "size_5", right = "size_9" },
-  size_9 = { up = "start", down = "difficulty_hard", left = "size_7", right = "size_5" },
-  difficulty_easy = { up = "size_5", down = "back", left = "difficulty_hard", right = "difficulty_medium" },
-  difficulty_medium = { up = "size_7", down = "start", left = "difficulty_easy", right = "difficulty_hard" },
-  difficulty_hard = { up = "size_9", down = "start", left = "difficulty_medium", right = "difficulty_easy" },
-  back = { up = "difficulty_easy", down = "size_5", left = "start", right = "start" },
-  start = { up = "difficulty_hard", down = "size_7", left = "back", right = "back" },
-}
+local PLAY_MENU_ROWS = { "size", "difficulty", "actions" }
+local BOARD_SIZES = { 5, 7, 9 }
+local DIFFICULTIES = { "easy", "medium", "hard" }
+
+local function index_of(list, value)
+  for index, candidate in ipairs(list) do
+    if candidate == value then
+      return index
+    end
+  end
+  return nil
+end
+
+local function cycle_value(list, current, direction)
+  local index = index_of(list, current) or 1
+  local next_index = ((index - 1 + direction) % #list) + 1
+  return list[next_index]
+end
 
 local function point_in_rect(x, y, rect)
   return x >= rect.x
@@ -161,7 +170,9 @@ function Game.new()
     right = { held = false, elapsed = 0 },
   }
   self.menu_focus_index = nil
+  self.play_menu_focus = { row = "size", action = "start" }
   self.settings_visible = false
+  self.ai_history = {}
   self.screen = nil
   self:set_screen("main_menu")
 
@@ -225,6 +236,7 @@ function Game:start_game(board_size, bot_difficulty)
   self.selected_bot_difficulty = difficulty
   self.board_size = size
   self.bot_difficulty = difficulty
+  self.ai_history = {}
   local next_state = rules.resolve_state(level.load(size))
   self:set_state(next_state, false)
   self:set_screen("playing", { with_intro = with_intro })
@@ -243,6 +255,7 @@ function Game:restart()
     return
   end
 
+  self.ai_history = {}
   local next_state = rules.resolve_state(level.load(self.board_size))
   self:set_state(next_state, false)
   self.ai_timer = 0
@@ -297,10 +310,28 @@ function Game:trigger_screen_shake(amplitude, duration)
   self.screen_shake.elapsed = 0
 end
 
+function Game:record_ai_history(state)
+  if not state then
+    return
+  end
+
+  local hash = ai.state_hash(state)
+  if not hash then
+    return
+  end
+
+  self.ai_history[#self.ai_history + 1] = hash
+
+  while #self.ai_history > AI_HISTORY_LIMIT do
+    table.remove(self.ai_history, 1)
+  end
+end
+
 function Game:commit_move(move)
   local moving_side = self.state and self.state.current_player
   local next_state = rules.resolve_state(rules.apply_move(self.state, move))
   self:set_state(next_state, self.state)
+  self:record_ai_history(next_state)
   self.ai_timer = 0
 
   if moving_side == "player" then
@@ -467,7 +498,10 @@ function Game:get_menu_ui(screen)
   end
 
   if target_screen == "play_menu" then
-    return render.get_play_menu_ui(width, height)
+    return render.get_play_menu_ui(width, height, {
+      board_size = self.selected_board_size,
+      difficulty = self.selected_bot_difficulty,
+    })
   end
 
   return nil
@@ -476,7 +510,7 @@ end
 function Game:get_menu_buttons(screen)
   local ui = self:get_menu_ui(screen)
 
-  if not ui then
+  if not ui or not ui.buttons then
     return nil
   end
 
@@ -495,14 +529,15 @@ end
 
 function Game:default_menu_focus_index(screen)
   local target_screen = screen or self.screen
+
+  if target_screen == "play_menu" then
+    return nil
+  end
+
   local buttons = self:get_menu_buttons(target_screen)
 
   if not buttons or #buttons == 0 then
     return nil
-  end
-
-  if target_screen == "play_menu" then
-    return find_button_index(buttons, "start") or 1
   end
 
   return find_button_index(buttons, "play") or 1
@@ -593,6 +628,9 @@ function Game:set_screen(screen, options)
   self.screen_shake.amplitude = 0
   self:reset_cursor_repeat()
   self.menu_focus_index = self:default_menu_focus_index(screen)
+  if screen == "play_menu" then
+    self.play_menu_focus = { row = "size", action = "start" }
+  end
   self.audio:set_context("menu")
 end
 
@@ -770,49 +808,106 @@ function Game:set_menu_focus_by_id(button_id)
 end
 
 function Game:move_menu_focus(direction)
-  local current_id = self:get_focused_menu_button_id()
-
-  if not current_id then
-    return
-  end
-
-  local mapping = nil
   if self.screen == "main_menu" then
-    mapping = MAIN_MENU_FOCUS
-  elseif self.screen == "play_menu" then
-    mapping = PLAY_MENU_FOCUS
-  end
+    local current_id = self:get_focused_menu_button_id()
 
-  if not mapping or not mapping[current_id] then
+    if not current_id then
+      return
+    end
+
+    local next_id = MAIN_MENU_FOCUS[current_id] and MAIN_MENU_FOCUS[current_id][direction]
+    if next_id then
+      self:set_menu_focus_by_id(next_id)
+
+      if next_id ~= current_id then
+        self.audio:play("navigate")
+      end
+    end
     return
   end
 
-  local next_id = mapping[current_id][direction]
-  if next_id then
-    self:set_menu_focus_by_id(next_id)
+  if self.screen == "play_menu" then
+    self:move_play_menu_focus(direction)
+  end
+end
 
-    if next_id ~= current_id then
+function Game:move_play_menu_focus(direction)
+  local focus = self.play_menu_focus
+  if not focus then
+    return
+  end
+
+  if direction == "up" or direction == "down" then
+    local step = direction == "up" and -1 or 1
+    local current_index = index_of(PLAY_MENU_ROWS, focus.row) or 1
+    local next_index = current_index + step
+
+    if next_index < 1 or next_index > #PLAY_MENU_ROWS then
+      return
+    end
+
+    focus.row = PLAY_MENU_ROWS[next_index]
+    self.audio:play("navigate")
+    return
+  end
+
+  local step = direction == "left" and -1 or 1
+
+  if focus.row == "size" then
+    local next_size = cycle_value(BOARD_SIZES, self.selected_board_size, step)
+    if next_size ~= self.selected_board_size then
+      self.selected_board_size = next_size
+      self.audio:play("navigate")
+    end
+    return
+  end
+
+  if focus.row == "difficulty" then
+    local next_difficulty = cycle_value(DIFFICULTIES, self.selected_bot_difficulty, step)
+    if next_difficulty ~= self.selected_bot_difficulty then
+      self.selected_bot_difficulty = next_difficulty
+      self.audio:play("navigate")
+    end
+    return
+  end
+
+  if focus.row == "actions" then
+    local next_action = focus.action == "back" and "start" or "back"
+    if next_action ~= focus.action then
+      focus.action = next_action
       self.audio:play("navigate")
     end
   end
 end
 
 function Game:activate_focused_menu_button()
-  local button_id = self:get_focused_menu_button_id()
-
-  if not button_id then
-    return
-  end
-
-  self.audio:play("confirm")
-
   if self.screen == "main_menu" then
+    local button_id = self:get_focused_menu_button_id()
+
+    if not button_id then
+      return
+    end
+
+    self.audio:play("confirm")
     self:handle_main_menu_action(button_id)
     return
   end
 
   if self.screen == "play_menu" then
-    self:handle_play_menu_action(button_id)
+    local focus = self.play_menu_focus
+    if not focus then
+      return
+    end
+
+    if focus.row == "size" or focus.row == "difficulty" then
+      self:move_play_menu_focus("right")
+      return
+    end
+
+    if focus.row == "actions" then
+      self.audio:play("confirm")
+      self:handle_play_menu_action(focus.action)
+    end
   end
 end
 
@@ -855,51 +950,14 @@ function Game:handle_main_menu_click(x, y)
   self:handle_main_menu_action(button_id)
 end
 
-function Game:handle_play_menu_action(button_id)
-  if button_id == "size_5" then
-    self.selected_board_size = 5
-    self:set_menu_focus_by_id(button_id)
-    return
-  end
-
-  if button_id == "size_7" then
-    self.selected_board_size = 7
-    self:set_menu_focus_by_id(button_id)
-    return
-  end
-
-  if button_id == "size_9" then
-    self.selected_board_size = 9
-    self:set_menu_focus_by_id(button_id)
-    return
-  end
-
-  if button_id == "difficulty_easy" then
-    self.selected_bot_difficulty = "easy"
-    self:set_menu_focus_by_id(button_id)
-    return
-  end
-
-  if button_id == "difficulty_medium" then
-    self.selected_bot_difficulty = "medium"
-    self:set_menu_focus_by_id(button_id)
-    return
-  end
-
-  if button_id == "difficulty_hard" then
-    self.selected_bot_difficulty = "hard"
-    self:set_menu_focus_by_id(button_id)
-    return
-  end
-
-  if button_id == "back" then
+function Game:handle_play_menu_action(action_id)
+  if action_id == "back" then
     self:set_screen("main_menu")
     return
   end
 
-  if button_id == "start" then
+  if action_id == "start" then
     self:start_game(self.selected_board_size, self.selected_bot_difficulty)
-    return
   end
 end
 
@@ -910,15 +968,31 @@ function Game:handle_play_menu_click(x, y)
     return
   end
 
-  local button_id, button_index = self:find_clicked_button(ui.buttons, x, y)
+  for _, row in ipairs(ui.rows) do
+    if row.kind == "cycler" then
+      if point_in_rect(x, y, row.left_rect) then
+        self.play_menu_focus.row = row.id
+        self:move_play_menu_focus("left")
+        return
+      end
 
-  if not button_id then
-    return
+      if point_in_rect(x, y, row.right_rect) then
+        self.play_menu_focus.row = row.id
+        self:move_play_menu_focus("right")
+        return
+      end
+    elseif row.kind == "button_pair" then
+      for _, button in ipairs(row.buttons) do
+        if point_in_rect(x, y, button) then
+          self.play_menu_focus.row = "actions"
+          self.play_menu_focus.action = button.id
+          self.audio:play("confirm")
+          self:handle_play_menu_action(button.id)
+          return
+        end
+      end
+    end
   end
-
-  self.menu_focus_index = button_index
-  self.audio:play("confirm")
-  self:handle_play_menu_action(button_id)
 end
 
 function Game:move_cursor(dx, dy)
@@ -996,7 +1070,7 @@ function Game:run_enemy_turn()
     return
   end
 
-  local move = ai.choose_move(self.state, "enemy", self.bot_difficulty)
+  local move = ai.choose_move(self.state, "enemy", self.bot_difficulty, self.ai_history)
 
   if not move then
     local next_state = rules.resolve_state(self.state)
@@ -1208,31 +1282,37 @@ function Game:keypressed(key)
 
     if key == "5" then
       self.selected_board_size = 5
+      self.play_menu_focus = { row = "actions", action = "start" }
       return
     end
 
     if key == "7" then
       self.selected_board_size = 7
+      self.play_menu_focus = { row = "actions", action = "start" }
       return
     end
 
     if key == "9" then
       self.selected_board_size = 9
+      self.play_menu_focus = { row = "actions", action = "start" }
       return
     end
 
     if key == "e" then
       self.selected_bot_difficulty = "easy"
+      self.play_menu_focus = { row = "actions", action = "start" }
       return
     end
 
     if key == "m" then
       self.selected_bot_difficulty = "medium"
+      self.play_menu_focus = { row = "actions", action = "start" }
       return
     end
 
     if key == "h" then
       self.selected_bot_difficulty = "hard"
+      self.play_menu_focus = { row = "actions", action = "start" }
       return
     end
 
@@ -1395,7 +1475,7 @@ function Game:draw()
     render.draw_play_menu(
       self.selected_board_size,
       self.selected_bot_difficulty,
-      self:get_focused_menu_button_id(),
+      self.play_menu_focus,
       self.menu_transition,
       self.menu_pulse_time,
       self:get_audio_status(),

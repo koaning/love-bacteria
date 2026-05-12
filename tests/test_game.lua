@@ -384,35 +384,125 @@ function Tests.play_menu_arrow_focus_can_activate_back()
   local game = Game.new()
   game:set_screen("play_menu")
 
+  -- Default focus is size row; reach the action row, swap to Back, confirm.
+  game:keypressed("down")
+  game:keypressed("down")
   game:keypressed("left")
   game:keypressed("return")
 
   assert_equal(game.screen, "main_menu", "Arrow focus plus Enter should activate focused play menu button")
 end
 
-function Tests.play_menu_vertical_focus_activates_difficulty()
+function Tests.play_menu_default_focus_is_size_row()
   local game = Game.new()
   game:set_screen("play_menu")
-  game.selected_bot_difficulty = "easy"
 
-  game:keypressed("up")
-  game:keypressed("return")
-
-  assert_equal(game.selected_bot_difficulty, "hard", "Up from start should focus hard difficulty")
-  assert_equal(game.screen, "play_menu", "Selecting difficulty should keep play menu open")
+  assert_equal(game.play_menu_focus.row, "size", "Default play-menu focus should be the size cycler")
+  assert_equal(game.play_menu_focus.action, "start", "Default action sub-focus should be Start")
 end
 
-function Tests.play_menu_arrow_focus_can_activate_medium_difficulty()
+function Tests.play_menu_up_at_top_row_stays_put()
+  local game = Game.new()
+  game:set_screen("play_menu")
+
+  game:keypressed("up")
+
+  assert_equal(game.play_menu_focus.row, "size", "Up at top row must not wrap to bottom")
+end
+
+function Tests.play_menu_down_at_actions_row_stays_put()
+  local game = Game.new()
+  game:set_screen("play_menu")
+
+  game:keypressed("down")
+  game:keypressed("down")
+  game:keypressed("down")
+
+  assert_equal(game.play_menu_focus.row, "actions", "Down at bottom row must not wrap to top")
+end
+
+function Tests.play_menu_right_cycles_board_size()
+  local game = Game.new()
+  game:set_screen("play_menu")
+  game.selected_board_size = 5
+
+  game:keypressed("right")
+  assert_equal(game.selected_board_size, 7, "Right on size row should advance 5 -> 7")
+  game:keypressed("right")
+  assert_equal(game.selected_board_size, 9, "Right on size row should advance 7 -> 9")
+  game:keypressed("right")
+  assert_equal(game.selected_board_size, 5, "Right on size row should wrap 9 -> 5")
+end
+
+function Tests.play_menu_difficulty_cycles_with_arrows()
   local game = Game.new()
   game:set_screen("play_menu")
   game.selected_bot_difficulty = "hard"
 
-  game:keypressed("up")
+  game:keypressed("down")
+  assert_equal(game.play_menu_focus.row, "difficulty", "Down from size should land on difficulty")
+
   game:keypressed("left")
+  assert_equal(game.selected_bot_difficulty, "medium", "Left on difficulty should cycle hard -> medium")
+  game:keypressed("left")
+  assert_equal(game.selected_bot_difficulty, "easy", "Left on difficulty should cycle medium -> easy")
+  game:keypressed("right")
+  assert_equal(game.selected_bot_difficulty, "medium", "Right on difficulty should cycle easy -> medium")
+end
+
+function Tests.play_menu_enter_on_cycler_advances_value()
+  local game = Game.new()
+  game:set_screen("play_menu")
+  game.selected_board_size = 7
+
   game:keypressed("return")
 
-  assert_equal(game.selected_bot_difficulty, "medium", "Arrow focus plus Enter should activate medium difficulty")
-  assert_equal(game.screen, "play_menu", "Selecting difficulty should keep play menu open")
+  assert_equal(game.selected_board_size, 9, "Enter on size cycler should advance forward like right arrow")
+  assert_equal(game.screen, "play_menu", "Enter on cycler should not leave the play menu")
+end
+
+function Tests.play_menu_action_row_left_right_swaps_focus()
+  local game = Game.new()
+  game:set_screen("play_menu")
+
+  game:keypressed("down")
+  game:keypressed("down")
+  assert_equal(game.play_menu_focus.row, "actions", "Two downs from top should reach the actions row")
+  assert_equal(game.play_menu_focus.action, "start", "Default action focus should be Start")
+
+  game:keypressed("left")
+  assert_equal(game.play_menu_focus.action, "back", "Left on actions row should focus Back")
+  game:keypressed("right")
+  assert_equal(game.play_menu_focus.action, "start", "Right on actions row should focus Start")
+end
+
+function Tests.play_menu_click_on_right_arrow_cycles_size()
+  local game = Game.new()
+  game:set_screen("play_menu")
+  game.selected_board_size = 5
+
+  local ui = game:get_menu_ui("play_menu")
+  local size_row = ui.rows[1]
+  game:handle_play_menu_click(size_row.right_rect.x + 2, size_row.right_rect.y + 2)
+
+  assert_equal(game.selected_board_size, 7, "Clicking [>] on size row should advance the value")
+  assert_equal(game.play_menu_focus.row, "size", "Clicking on a cycler row should focus that row")
+end
+
+function Tests.play_menu_click_on_start_button_starts_game()
+  local game = Game.new()
+  game:set_screen("play_menu")
+  game.selected_board_size = 5
+  game.selected_bot_difficulty = "easy"
+
+  local ui = game:get_menu_ui("play_menu")
+  local actions_row = ui.rows[3]
+  local start_button = actions_row.buttons[2]
+  game:handle_play_menu_click(start_button.x + 2, start_button.y + 2)
+
+  assert_equal(game.screen, "playing", "Clicking Start should start the game")
+  assert_equal(game.state.width, 5, "Started game should use the selected board size")
+  assert_equal(game.bot_difficulty, "easy", "Started game should use the selected difficulty")
 end
 
 function Tests.fullscreen_hotkeys_toggle_window_mode()
