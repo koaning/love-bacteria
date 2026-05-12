@@ -3,3 +3,4 @@ dist/
 assets/audio/music/demos/
 web/lovejs/*
 !web/lovejs/README.md
+conductor.json
