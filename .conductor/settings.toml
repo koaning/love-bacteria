@@ -1,0 +1,6 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+[scripts]
+archive = "scripts/update-steam-deck.sh"
+run = "make run"
+run_mode = "concurrent"

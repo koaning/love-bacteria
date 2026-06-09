@@ -8,7 +8,7 @@ The goal: **one short Desktop Mode visit to set things up, then everything else 
 
 1. **On your Mac**: tag a release (or click "Run workflow" in Actions) → GitHub builds `Sporeline-x86_64.AppImage`.
 2. **On the Deck (once, in Desktop Mode)**: set sudo password, enable SSH, run `scripts/install-on-deck.sh --latest`, add the AppImage to Steam via the UI.
-3. **From then on (from your Mac)**: `ssh deck@<ip> 'bash -s -- --latest' < scripts/install-on-deck.sh` to pull and install new builds. No Desktop Mode needed.
+3. **From then on (from your Mac)**: `ssh deck@steamdeck 'bash -s -- --latest' < scripts/install-on-deck.sh` to pull and install new builds over Tailscale. No Desktop Mode needed.
 
 ---
 
@@ -53,20 +53,74 @@ If you don't have a USB/Bluetooth keyboard attached, use the on-screen keyboard:
 
 Pairing a cheap Bluetooth keyboard under **Settings → Bluetooth** makes this visit *much* less painful.
 
-### 2c. Set password, enable SSH, install
+### 2c. Install Tailscale
 
 Open **Konsole** (search "Konsole" in the app launcher) and run:
 
 ```bash
-# Set a password for the 'deck' user — needed for sudo and SSH.
+# Set a password for the 'deck' user. This is needed for sudo.
 passwd
 
-# Enable the SSH server (installed but disabled by default).
-sudo systemctl enable --now sshd
+# Install Tailscale using its Steam Deck installer.
+git clone https://github.com/tailscale-dev/deck-tailscale.git ~/deck-tailscale
+sudo -i
+cd ~deck/deck-tailscale
+mkdir -p /etc/atomic-update.conf.d
+bash tailscale.sh
+source /etc/profile.d/tailscale.sh
 
-# Note the Deck's LAN IP — you'll use it from your Mac.
-ip -br addr show | grep -v '^lo'
+# Join the same tailnet as the Mac and set the expected MagicDNS name.
+tailscale up --qr --operator=deck --hostname=steamdeck
+
+# Verify the connection.
+tailscale status
+tailscale ip
+exit
 ```
+
+Scan the displayed QR code and authenticate with the same Tailscale account
+used on the Mac. MagicDNS is enabled by default for newer tailnets; otherwise,
+enable it in the Tailscale admin console's DNS page.
+
+Install and sign in to Tailscale on the Mac as well. Then verify that the
+Steam Deck resolves by name:
+
+```bash
+ping steamdeck
+```
+
+### 2d. Enable SSH and key authentication
+
+Back in the Steam Deck's Konsole:
+
+```bash
+# Enable the standard SSH server on every boot.
+sudo systemctl enable --now sshd
+```
+
+From the Mac, install its public key on the Steam Deck:
+
+```bash
+cat ~/.ssh/id_rsa.pub | ssh deck@steamdeck \
+  'umask 077; mkdir -p ~/.ssh; cat >> ~/.ssh/authorized_keys'
+
+# The archive hook must connect without a password prompt.
+ssh -o BatchMode=yes deck@steamdeck true
+```
+
+Optionally add a stable SSH alias to `~/.ssh/config`. Use the MagicDNS name,
+not the numeric Tailscale IP:
+
+```sshconfig
+Host steamdeck
+    HostName steamdeck.<your-tailnet>.ts.net
+    User deck
+    IdentityFile ~/.ssh/id_rsa
+    IdentitiesOnly yes
+```
+
+After that, `ssh steamdeck` is enough. To inspect the Deck's numeric Tailscale
+IPv4 address anyway, run `tailscale ip -4` on the Deck.
 
 Still in Konsole, install Sporeline with the helper script. Either copy the script over (USB, Syncthing, or clone this repo on the Deck), or paste its contents inline:
 
@@ -99,11 +153,24 @@ Once the Steam shortcut exists, upgrades are remote-only. From your Mac:
 
 ```bash
 # Option A: push a freshly built AppImage
-scp dist/Sporeline-x86_64.AppImage deck@<deck-ip>:~/Applications/
+scp dist/Sporeline-x86_64.AppImage deck@steamdeck:~/Applications/
 
 # Option B: ask the Deck to pull the latest release itself
-ssh deck@<deck-ip> 'curl -fsSL https://raw.githubusercontent.com/koaning/love-bacteria/main/scripts/install-on-deck.sh | bash -s -- --latest'
+ssh deck@steamdeck 'curl -fsSL https://raw.githubusercontent.com/koaning/love-bacteria/main/scripts/install-on-deck.sh | bash -s -- --latest'
 ```
+
+### Update automatically when archiving a Conductor workspace
+
+Conductor runs `scripts/update-steam-deck.sh` before archiving a workspace. The
+script uses the `steamdeck` SSH alias over Tailscale and installs the latest
+GitHub release:
+
+```bash
+scripts/update-steam-deck.sh
+```
+
+The archive hook uses SSH batch mode, so configure key-based authentication
+first. This prevents an archive operation from hanging on a password prompt.
 
 Gaming Mode's existing Sporeline shortcut points at `~/Applications/Sporeline-x86_64.AppImage` — when you overwrite that file, the next launch runs the new build.
 
@@ -127,7 +194,7 @@ Or drop PNGs into `~/.steam/steam/userdata/<your-steam-id>/config/grid/` on the 
 Since the Deck's filesystem is reachable over SSH, you can push artwork from your Mac the same way as the AppImage:
 
 ```bash
-scp capsule.png deck@<deck-ip>:~/.steam/steam/userdata/<id>/config/grid/<appid>p.png
+scp capsule.png deck@steamdeck:~/.steam/steam/userdata/<id>/config/grid/<appid>p.png
 ```
 
 ---
