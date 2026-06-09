@@ -162,15 +162,17 @@ ssh deck@steamdeck 'curl -fsSL https://raw.githubusercontent.com/koaning/love-ba
 ### Update automatically when archiving a Conductor workspace
 
 Conductor runs `scripts/update-steam-deck.sh` before archiving a workspace. The
-script uses the `steamdeck` SSH alias over Tailscale and installs the latest
-GitHub release:
+script triggers the Release workflow for the current pushed commit, downloads
+its AppImage artifact, and copies it to the `steamdeck` SSH alias over
+Tailscale:
 
 ```bash
 scripts/update-steam-deck.sh
 ```
 
 The archive hook uses SSH batch mode, so configure key-based authentication
-first. This prevents an archive operation from hanging on a password prompt.
+first. It also requires the GitHub CLI to be authenticated and the current
+branch to be pushed, because GitHub Actions builds the Linux AppImage.
 
 Gaming Mode's existing Sporeline shortcut points at `~/Applications/Sporeline-x86_64.AppImage` — when you overwrite that file, the next launch runs the new build.
 
