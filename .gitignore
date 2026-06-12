@@ -4,3 +4,7 @@ assets/audio/music/demos/
 web/lovejs/*
 !web/lovejs/README.md
 conductor.json
+simulation/*.pt
+simulation/weights.json
+simulation/games.jsonl
+__pycache__/
