@@ -196,6 +196,14 @@ def train(size: int = 7,
     # one canonical training trace: --fresh restarts the log, resume appends
     log = (HERE / "games.jsonl").open("w" if fresh else "a")
     pool = []  # sliding window of frozen (label, net) snapshots
+    if not fresh:
+        snaps = sorted(HERE.glob("snapshot-*.pt"), key=lambda p: int(p.stem.split("-")[1]))
+        for path in snaps[-POOL_SIZE:]:
+            snap, _ = load_net(path)
+            if snap.n == size:
+                pool.append((path.stem.split("-")[1], snap))
+        if pool:
+            print(f"seeded pool from disk: {', '.join(label for label, _ in pool)}")
 
     def add_to_pool(label):
         snap = PolicyNet(size, net.hidden)
