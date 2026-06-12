@@ -18,7 +18,7 @@ Training shows a live table with EMA win rates per opponent. The net starts
 against `easy`, then unlocks `medium` and self-play once it wins >80% against
 the newest rung. Self-play opponents come from a sliding pool: every
 `--snapshot` batches (default 500) the current net is frozen, saved as
-`snapshot-<batch>.pt`, and added to the pool (newest 3 kept), so old selves
+`snapshot-<batch>.pt`, and added to the pool (newest 5 kept), so old selves
 can also be pitted against new ones with `simulate`. `hard` is not a training
 opponent (its search makes games ~100x slower) — use it as the benchmark:
 `uv run train.py simulate checkpoint.pt hard`.

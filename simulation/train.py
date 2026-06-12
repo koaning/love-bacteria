@@ -11,7 +11,7 @@
 
 The net starts against the easy AI and unlocks medium and self-play as its win
 rate climbs. Self-play opponents are frozen snapshots: every --snapshot batches
-the current net joins a sliding pool of the newest 3. Progress is a rich live
+the current net joins a sliding pool of the newest 5. Progress is a rich live
 table. Weights are saved to weights.json (plain matrices, ready for a future
 Lua loader) and checkpoint.pt (for resuming). Every game played — training and
 simulate — is appended to games.jsonl, replayable through game.py.
@@ -38,7 +38,7 @@ from game import PLAYER, TIE, Bot
 HERE = Path(__file__).parent
 RUNGS = ("easy", "medium")  # scripted ladder; snapshot selves join the mix on their own
 UNLOCK_WINRATE = 0.8
-POOL_SIZE = 3  # frozen self opponents kept (sliding window of the last 3 snapshots)
+POOL_SIZE = 5  # frozen self opponents kept (sliding window of the last 5 snapshots)
 WINKEY = {1: "p1", 2: "p2", TIE: "tie"}
 
 app = typer.Typer(add_completion=False, help=__doc__.splitlines()[0])
