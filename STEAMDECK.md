@@ -31,7 +31,7 @@ git push origin v0.1.0
 make appimage
 ```
 
-Produces `dist/Sporeline-x86_64.AppImage`. Requires `curl`, `zip`, and a Linux host — the Makefile refuses on macOS.
+Produces `dist/Sporeline-x86_64.AppImage` (built in `love/dist/` and copied up to the root). Requires `curl`, `zip`, and a Linux host — the Makefile refuses on macOS.
 
 ---
 

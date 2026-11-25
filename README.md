@@ -1,143 +1,73 @@
 # Sporeline
 
-A small LÖVE 2D strategy game inspired by the bacteria puzzle from *The 7th Guest*.
+A small bacteria strategy game, inspired by the bacteria puzzle from *The 7th
+Guest*. It comes in two editions that share the same AI:
 
-## Requirements
+| | Edition | Run |
+| --- | --- | --- |
+| [`love/`](love/README.md) | LÖVE 11.5 version with the ambitious graphics: shaders, music, Steam Deck, web build | `make run` |
+| [`pico8/`](pico8/README.md) | PICO-8 cart, 128×128, 3 sound effects | `make pico8` |
 
-- Install LÖVE 11.x from [love2d.org](https://love2d.org/).
+| LÖVE | PICO-8 |
+| --- | --- |
+| ![LÖVE edition](docs/screenshots/love.png) | ![PICO-8 edition](docs/screenshots/pico8.png) |
 
-## Run
+The two AIs are **twin files**, `love/src/ai.lua` and `pico8/ai.lua`. A
+"mirror match" test keeps them honest: both play the same seeded games and
+must pick the same move every turn. See [MIRROR.md](MIRROR.md).
 
-From this directory:
-
-```bash
-love .
-```
-
-On macOS, if `love` is not on your `PATH`, launch the `.app` and open this folder as a project or add the CLI wrapper manually.
-If macOS blocks `love` with a developer verification warning, remove quarantine first:
-
-```bash
-xattr -dr com.apple.quarantine /Applications/love.app
-```
-
-## Tests
-
-Run the lightweight Lua test suite:
+## Play both in a browser
 
 ```bash
-luajit tests/run.lua
+make fetch-lovejs   # once: download the love.js runtime
+make serve          # build dist/site and serve it on :8000 (PORT=9000 to change)
 ```
 
-## Build
+`make serve` builds one static site, `dist/site/`:
 
-Create distributable output:
+- `/`: landing page with both editions
+- `/love/`: the LÖVE edition via love.js
+- `/pico8/`: the cart on the **PICO-8 preview player** (`pico8/preview/`), a
+  small PICO-8 stand-in written in LÖVE, also via love.js
+- `/pico8-official/`: added only when the `pico8` binary is installed
+  (`PICO8=/path/to/pico8`). It's the real PICO-8 HTML export.
+
+`tools/serve.py` sends the COOP/COEP headers love.js needs. On an exe.dev VM
+the site is at `https://<vm>.exe.xyz:8000/`.
+
+## Commands (repo root)
 
 ```bash
-make build
+make test     # LÖVE unit tests + mirror match + cart smoke test + token meter
+              #   (same as `luajit tests/run.lua`, which is what CI runs)
+make mirror   # just the LÖVE-vs-PICO-8 AI parity games
+make run      # play the LÖVE edition
+make pico8    # open the cart in PICO-8 (set PICO8=/path/to/pico8 if needed)
+make serve    # both editions on a local web page (see above)
+make appimage # LÖVE Steam Deck build → dist/ (also build, web, …)
 ```
 
-This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `dist/Sporeline.app`.
+Tests need `luajit`. The web build also needs `zip` and `curl`.
 
-## Steam Deck
+## Layout
 
-Sporeline runs on Steam Deck as a Non-Steam game via a Linux AppImage. Native gamepad support is built in (D-pad + ABXY + shoulders + Start), so the Deck's controls work with no Steam Input remapping.
-
-- Build the AppImage: push a git tag (CI attaches `Sporeline-x86_64.AppImage` to the release) or run `make appimage` on a Linux host.
-- Full walkthrough — one-time Deck setup over SSH, install script, and future updates from your Mac — is in [STEAMDECK.md](STEAMDECK.md).
-
-## Web Build (Playable Embed)
-
-To prepare a browser-playable build:
-
-1. Download the web runtime:
-
-```bash
-make fetch-lovejs
 ```
-
-2. Build the web package:
-
-```bash
-make web
+love/        LÖVE edition (main.lua, src/, assets/, tests/, web/, build/)
+pico8/       PICO-8 edition (sporeline.p8 + #included .lua files)
+pico8/preview/  PICO-8 preview player (LÖVE) used for the web build
+site/        landing page + PICO-8 page templates for `make site`
+tests/       run.lua (runs everything), mirror_match.lua, cart_smoke.lua
+tools/       pico8_env.lua (PICO-8 sandbox for LuaJIT), p8tokens.lua, serve.py
+docs/        screenshots
+scripts/     Steam Deck install/update helpers (see STEAMDECK.md)
+MIRROR.md    how the two AIs stay in sync
 ```
-
-This creates `dist/web/` with:
-- `index.html` player page
-- `sporeline.love` game package
-- header config files (`_headers`, `.htaccess`) required by `love.js`
-
-Deploy `dist/web/` to a host where you can set these headers:
-
-- `Cross-Origin-Opener-Policy: same-origin`
-- `Cross-Origin-Embedder-Policy: require-corp`
-
-Then embed in your blog with an iframe:
-
-```html
-<iframe
-  src="https://games.your-domain.com/sporeline/"
-  width="900"
-  height="900"
-  style="border:0;max-width:100%;"
-  loading="lazy"
-></iframe>
-```
-
-If your blog platform cannot set those headers, host the game on a separate static host/subdomain and embed that URL.
-
-For local testing, serve `dist/web/` (not the source `web/` folder):
-
-```bash
-cd dist/web
-python3 -m http.server 8000
-```
-
-## Controls
-
-- Main menu: click `Play`, choose `5x5`, `7x7`, or `9x9`, pick bot difficulty (`Easy`, `Medium`, or `Hard`), then click `Start`.
-- Menu keyboard: `Arrow keys` move focus logically, `Enter`/`Space` activates focused button.
-- Main menu keyboard: `P` opens Play, `Esc` quits.
-- Play menu keyboard: `5`/`7`/`9` choose board size, `E`/`M`/`H` choose bot difficulty, `Esc` goes back.
-- `Tab` shows/hides the menu settings row.
-- Menus include a settings row for `Fullscreen`, `Mute`, and `SFX/Music` volume (`+/-`) via mouse click.
-- Gamepad: D-pad navigates, `A` confirms, `B` goes back, `X` toggles mute, `Y` restarts, shoulder buttons toggle the settings row.
-- Left click one of your bacteria to select it.
-- Left click a highlighted cell to move.
-- In game keyboard: `Arrow keys` move the cursor, `Enter`/`Space` select and move.
-- `M` toggles mute (`Shift+M` while in the play menu to avoid clashing with medium difficulty hotkey).
-- `F` or `F11` toggles fullscreen.
-- `R` restarts the board.
-- `Esc` returns to the main menu.
-- `Esc` on the main menu quits.
 
 ## Rules
 
-- The board size is chosen before play: `5x5`, `7x7`, or `9x9`.
-- You control the teal bacteria. The AI controls the orange bacteria.
-- A grow move places a new bacterium into any adjacent cell, including diagonals.
-- A jump move moves a bacterium exactly 2 cells up, down, left, or right, and leaves the origin empty.
-- After either move type, any adjacent enemy bacteria around the destination are converted.
-- If one side is eliminated, the other side wins immediately.
-- If no legal moves remain for both sides, the side with more bacteria wins.
-- If a side has no legal moves but still has pieces, it passes automatically.
-
-## Project Layout
-
-- `conf.lua` sets the desktop window config.
-- `main.lua` wires LÖVE callbacks into the game object.
-- `src/board.lua` contains board helpers and state cloning.
-- `src/rules.lua` contains move generation, move resolution, passing, and win detection.
-- `src/ai.lua` contains enemy move selection logic for easy/medium/hard difficulties.
-- `src/render.lua` draws the board, HUD, highlights, and end-game overlay.
-- `src/input.lua` handles simple mouse and keyboard helpers.
-- `src/audio.lua` manages SFX, mute state, and shared background music fading.
-- `assets/audio/` (optional) can provide custom `sfx/*.ogg` and `music/game.ogg` files.
-- `web/` contains the browser player template and header config used by `make web`.
-- `src/level.lua` defines the starting layout for the chosen board size.
-- `src/game.lua` coordinates turn flow and AI timing.
-- `assets/fonts/` contains bundled UI fonts used for title/body typography.
-
-## Notes
-
-Run `love .` for a manual visual pass over transitions, animations, and typography.
+- Both editions play on a 7×7 board, starting with one bacterium per side in each pair of opposite corners.
+- Grow: place a new bacterium in any adjacent cell (diagonals included).
+- Jump: move a bacterium exactly 2 cells orthogonally, leaving the origin empty.
+- After either move, adjacent enemy bacteria around the destination convert.
+- Eliminate the other side to win; if nobody can move, the bigger colony wins.
+- A side with no legal moves passes automatically.

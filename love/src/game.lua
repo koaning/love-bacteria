@@ -29,8 +29,7 @@ local MAIN_MENU_FOCUS = {
   quit = { up = "play", down = "play", left = "play", right = "play" },
 }
 
-local PLAY_MENU_ROWS = { "size", "difficulty", "actions" }
-local BOARD_SIZES = { 5, 7, 9 }
+local PLAY_MENU_ROWS = { "difficulty", "actions" }
 local DIFFICULTIES = { "easy", "medium", "hard" }
 
 local function index_of(list, value)
@@ -144,8 +143,6 @@ function Game.new()
   self.ai_delay = 0.45
   self.ai_timer = 0
   self.state = nil
-  self.selected_board_size = 7
-  self.board_size = 7
   self.selected_bot_difficulty = "hard"
   self.bot_difficulty = "hard"
   self.cursor_cell = nil
@@ -170,7 +167,7 @@ function Game.new()
     right = { held = false, elapsed = 0 },
   }
   self.menu_focus_index = nil
-  self.play_menu_focus = { row = "size", action = "start" }
+  self.play_menu_focus = { row = "difficulty", action = "start" }
   self.settings_visible = false
   self.ai_history = {}
   self.screen = nil
@@ -228,16 +225,13 @@ function Game:reset_cursor_repeat()
   end
 end
 
-function Game:start_game(board_size, bot_difficulty)
-  local size = board_size or self.selected_board_size or 7
+function Game:start_game(bot_difficulty)
   local difficulty = bot_difficulty or self.selected_bot_difficulty or "hard"
   local with_intro = self.screen == "main_menu" or self.screen == "play_menu"
-  self.selected_board_size = size
   self.selected_bot_difficulty = difficulty
-  self.board_size = size
   self.bot_difficulty = difficulty
   self.ai_history = {}
-  local next_state = rules.resolve_state(level.load(size))
+  local next_state = rules.resolve_state(level.load())
   self:set_state(next_state, false)
   self:set_screen("playing", { with_intro = with_intro })
   self.ai_timer = 0
@@ -256,7 +250,7 @@ function Game:restart()
   end
 
   self.ai_history = {}
-  local next_state = rules.resolve_state(level.load(self.board_size))
+  local next_state = rules.resolve_state(level.load())
   self:set_state(next_state, false)
   self.ai_timer = 0
   self.move_animation = nil
@@ -499,7 +493,6 @@ function Game:get_menu_ui(screen)
 
   if target_screen == "play_menu" then
     return render.get_play_menu_ui(width, height, {
-      board_size = self.selected_board_size,
       difficulty = self.selected_bot_difficulty,
     })
   end
@@ -629,7 +622,7 @@ function Game:set_screen(screen, options)
   self:reset_cursor_repeat()
   self.menu_focus_index = self:default_menu_focus_index(screen)
   if screen == "play_menu" then
-    self.play_menu_focus = { row = "size", action = "start" }
+    self.play_menu_focus = { row = "difficulty", action = "start" }
   end
   self.audio:set_context("menu")
 end
@@ -853,15 +846,6 @@ function Game:move_play_menu_focus(direction)
 
   local step = direction == "left" and -1 or 1
 
-  if focus.row == "size" then
-    local next_size = cycle_value(BOARD_SIZES, self.selected_board_size, step)
-    if next_size ~= self.selected_board_size then
-      self.selected_board_size = next_size
-      self.audio:play("navigate")
-    end
-    return
-  end
-
   if focus.row == "difficulty" then
     local next_difficulty = cycle_value(DIFFICULTIES, self.selected_bot_difficulty, step)
     if next_difficulty ~= self.selected_bot_difficulty then
@@ -899,7 +883,7 @@ function Game:activate_focused_menu_button()
       return
     end
 
-    if focus.row == "size" or focus.row == "difficulty" then
+    if focus.row == "difficulty" then
       self:move_play_menu_focus("right")
       return
     end
@@ -957,7 +941,7 @@ function Game:handle_play_menu_action(action_id)
   end
 
   if action_id == "start" then
-    self:start_game(self.selected_board_size, self.selected_bot_difficulty)
+    self:start_game(self.selected_bot_difficulty)
   end
 end
 
@@ -1280,24 +1264,6 @@ function Game:keypressed(key)
       return
     end
 
-    if key == "5" then
-      self.selected_board_size = 5
-      self.play_menu_focus = { row = "actions", action = "start" }
-      return
-    end
-
-    if key == "7" then
-      self.selected_board_size = 7
-      self.play_menu_focus = { row = "actions", action = "start" }
-      return
-    end
-
-    if key == "9" then
-      self.selected_board_size = 9
-      self.play_menu_focus = { row = "actions", action = "start" }
-      return
-    end
-
     if key == "e" then
       self.selected_bot_difficulty = "easy"
       self.play_menu_focus = { row = "actions", action = "start" }
@@ -1473,7 +1439,6 @@ function Game:draw()
 
   if self.screen == "play_menu" then
     render.draw_play_menu(
-      self.selected_board_size,
       self.selected_bot_difficulty,
       self.play_menu_focus,
       self.menu_transition,

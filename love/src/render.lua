@@ -862,11 +862,6 @@ end
 
 local DIFFICULTY_LABELS = { easy = "Easy", medium = "Medium", hard = "Hard" }
 
-local function size_value_text(size)
-  local n = size or 7
-  return tostring(n) .. "x" .. tostring(n)
-end
-
 local function difficulty_value_text(difficulty)
   return DIFFICULTY_LABELS[difficulty or "hard"] or "Hard"
 end
@@ -932,12 +927,13 @@ function Render.get_play_menu_ui(width, height, view)
   end
 
   local cyclers_top = panel_y + 130
-  local size_row = build_cycler("size", "Board Size", size_value_text(view.board_size), cyclers_top)
+  -- The board is always 7x7, so difficulty is the only setting. Centre its
+  -- row in the space the old two-row layout used.
   local difficulty_row = build_cycler(
     "difficulty",
     "Bot Difficulty",
     difficulty_value_text(view.difficulty),
-    cyclers_top + row_height + row_gap
+    cyclers_top + math.floor((row_height + row_gap) * 0.5)
   )
 
   local action_button_width = 180
@@ -981,7 +977,7 @@ function Render.get_play_menu_ui(width, height, view)
       { id = "music_down", x = math.floor((width - 640) * 0.5) + 438, y = height - 62, width = 96, height = 42 },
       { id = "music_up", x = math.floor((width - 640) * 0.5) + 544, y = height - 62, width = 96, height = 42 },
     },
-    rows = { size_row, difficulty_row, actions_row },
+    rows = { difficulty_row, actions_row },
   }
 end
 
@@ -1064,10 +1060,9 @@ function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time, a
   end
 end
 
-function Render.draw_play_menu(selected_size, selected_difficulty, focus, menu_transition, pulse_time, audio_status, settings_visible)
+function Render.draw_play_menu(selected_difficulty, focus, menu_transition, pulse_time, audio_status, settings_visible)
   local width, height = love.graphics.getDimensions()
   local ui = Render.get_play_menu_ui(width, height, {
-    board_size = selected_size,
     difficulty = selected_difficulty,
   })
   local transition = clamp(menu_transition or 1, 0, 1)

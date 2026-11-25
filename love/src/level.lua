@@ -2,8 +2,11 @@ local board = require("src.board")
 
 local Level = {}
 
-function Level.load(size)
-  local board_size = size or 7
+-- Sporeline is always played on a 7x7 dish (both the LÖVE and PICO-8 editions).
+Level.BOARD_SIZE = 7
+
+function Level.load()
+  local board_size = Level.BOARD_SIZE
   local state = board.new_state(board_size, board_size)
 
   board.set_cell(state, 1, 1, "player")
