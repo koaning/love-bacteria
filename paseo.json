@@ -1,0 +1,10 @@
+{
+  "worktree": {
+    "setup": "bash scripts/check-deps.sh",
+    "teardown": "true"
+  },
+  "scripts": {
+    "check-deps": { "command": "bash scripts/check-deps.sh" },
+    "test": { "command": "make test" }
+  }
+}
