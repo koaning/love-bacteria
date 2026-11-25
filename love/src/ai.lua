@@ -4,8 +4,10 @@ local rules = require("src.rules")
 local AI = {}
 
 local HARD_SEARCH_DEPTH = 2
-local INFINITY = math.huge
-local WIN_SCORE = 100000
+-- Kept inside PICO-8's 16.16 fixed-point range (|n| < 32768) so pico8/ai.lua
+-- can mirror these numbers exactly.
+local INFINITY = 32000
+local WIN_SCORE = 10000
 
 function AI.state_hash(state)
   if not state then

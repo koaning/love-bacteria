@@ -167,29 +167,25 @@ function Tests.enemy_keeps_turn_when_player_remains_blocked()
   assert_equal(#rules.get_legal_moves(game.state, "player"), 0, "Player should still have no moves")
 end
 
-function Tests.start_game_uses_selected_board_size()
+function Tests.start_game_always_uses_7x7_board()
   local game = Game.new()
 
-  game:start_game(5)
+  game:start_game()
   assert_equal(game.screen, "playing", "Start game should enter playing screen")
-  assert_equal(game.state.width, 5, "Board width should match configured size")
-  assert_equal(game.state.height, 5, "Board height should match configured size")
-
-  game:start_game(9)
-  assert_equal(game.state.width, 9, "Board width should update to new configured size")
-  assert_equal(game.state.height, 9, "Board height should update to new configured size")
+  assert_equal(game.state.width, 7, "Board is always 7 wide")
+  assert_equal(game.state.height, 7, "Board is always 7 tall")
 end
 
 function Tests.start_game_uses_selected_bot_difficulty()
   local game = Game.new()
 
-  game:start_game(7, "easy")
+  game:start_game("easy")
   assert_equal(game.bot_difficulty, "easy", "Bot difficulty should be set when starting game")
 
-  game:start_game(7, "medium")
+  game:start_game("medium")
   assert_equal(game.bot_difficulty, "medium", "Bot difficulty should support medium")
 
-  game:start_game(7, "hard")
+  game:start_game("hard")
   assert_equal(game.bot_difficulty, "hard", "Bot difficulty should switch between easy and hard")
 end
 
@@ -212,7 +208,7 @@ end
 
 function Tests.play_transition_advances_during_gameplay()
   local game = Game.new()
-  game:start_game(7, "hard")
+  game:start_game("hard")
 
   assert_equal(game.play_transition, 0, "Gameplay transition should reset when entering a match")
   game:update(0.10)
@@ -230,7 +226,7 @@ function Tests.start_game_intro_keeps_shared_music_running_until_game_cue()
   game:set_screen("play_menu")
   initial_context_calls = #game.audio.context_calls
 
-  game:start_game(7, "hard")
+  game:start_game("hard")
 
   assert_equal(#game.audio.target_music_calls, 0, "Shared music should keep running during intro")
   assert_equal(#game.audio.context_calls, initial_context_calls, "Game music should not start immediately when intro begins")
@@ -256,12 +252,10 @@ function Tests.play_menu_keyboard_shortcuts()
   local game = Game.new()
   game:set_screen("play_menu")
 
-  game:keypressed("5")
   game:keypressed("e")
   game:keypressed("return")
 
   assert_equal(game.screen, "playing", "Enter should start game from play menu")
-  assert_equal(game.state.width, 5, "Board size hotkey should be applied")
   assert_equal(game.bot_difficulty, "easy", "Difficulty hotkey should be applied")
 end
 
@@ -384,8 +378,7 @@ function Tests.play_menu_arrow_focus_can_activate_back()
   local game = Game.new()
   game:set_screen("play_menu")
 
-  -- Default focus is size row; reach the action row, swap to Back, confirm.
-  game:keypressed("down")
+  -- Default focus is the difficulty row; reach the action row, swap to Back, confirm.
   game:keypressed("down")
   game:keypressed("left")
   game:keypressed("return")
@@ -393,11 +386,11 @@ function Tests.play_menu_arrow_focus_can_activate_back()
   assert_equal(game.screen, "main_menu", "Arrow focus plus Enter should activate focused play menu button")
 end
 
-function Tests.play_menu_default_focus_is_size_row()
+function Tests.play_menu_default_focus_is_difficulty_row()
   local game = Game.new()
   game:set_screen("play_menu")
 
-  assert_equal(game.play_menu_focus.row, "size", "Default play-menu focus should be the size cycler")
+  assert_equal(game.play_menu_focus.row, "difficulty", "Default play-menu focus should be the difficulty cycler")
   assert_equal(game.play_menu_focus.action, "start", "Default action sub-focus should be Start")
 end
 
@@ -407,7 +400,7 @@ function Tests.play_menu_up_at_top_row_stays_put()
 
   game:keypressed("up")
 
-  assert_equal(game.play_menu_focus.row, "size", "Up at top row must not wrap to bottom")
+  assert_equal(game.play_menu_focus.row, "difficulty", "Up at top row must not wrap to bottom")
 end
 
 function Tests.play_menu_down_at_actions_row_stays_put()
@@ -421,26 +414,12 @@ function Tests.play_menu_down_at_actions_row_stays_put()
   assert_equal(game.play_menu_focus.row, "actions", "Down at bottom row must not wrap to top")
 end
 
-function Tests.play_menu_right_cycles_board_size()
-  local game = Game.new()
-  game:set_screen("play_menu")
-  game.selected_board_size = 5
-
-  game:keypressed("right")
-  assert_equal(game.selected_board_size, 7, "Right on size row should advance 5 -> 7")
-  game:keypressed("right")
-  assert_equal(game.selected_board_size, 9, "Right on size row should advance 7 -> 9")
-  game:keypressed("right")
-  assert_equal(game.selected_board_size, 5, "Right on size row should wrap 9 -> 5")
-end
-
 function Tests.play_menu_difficulty_cycles_with_arrows()
   local game = Game.new()
   game:set_screen("play_menu")
   game.selected_bot_difficulty = "hard"
 
-  game:keypressed("down")
-  assert_equal(game.play_menu_focus.row, "difficulty", "Down from size should land on difficulty")
+  assert_equal(game.play_menu_focus.row, "difficulty", "Play menu should open on the difficulty row")
 
   game:keypressed("left")
   assert_equal(game.selected_bot_difficulty, "medium", "Left on difficulty should cycle hard -> medium")
@@ -453,11 +432,11 @@ end
 function Tests.play_menu_enter_on_cycler_advances_value()
   local game = Game.new()
   game:set_screen("play_menu")
-  game.selected_board_size = 7
+  game.selected_bot_difficulty = "easy"
 
   game:keypressed("return")
 
-  assert_equal(game.selected_board_size, 9, "Enter on size cycler should advance forward like right arrow")
+  assert_equal(game.selected_bot_difficulty, "medium", "Enter on difficulty cycler should advance forward like right arrow")
   assert_equal(game.screen, "play_menu", "Enter on cycler should not leave the play menu")
 end
 
@@ -466,8 +445,7 @@ function Tests.play_menu_action_row_left_right_swaps_focus()
   game:set_screen("play_menu")
 
   game:keypressed("down")
-  game:keypressed("down")
-  assert_equal(game.play_menu_focus.row, "actions", "Two downs from top should reach the actions row")
+  assert_equal(game.play_menu_focus.row, "actions", "One down from the difficulty row should reach the actions row")
   assert_equal(game.play_menu_focus.action, "start", "Default action focus should be Start")
 
   game:keypressed("left")
@@ -476,32 +454,32 @@ function Tests.play_menu_action_row_left_right_swaps_focus()
   assert_equal(game.play_menu_focus.action, "start", "Right on actions row should focus Start")
 end
 
-function Tests.play_menu_click_on_right_arrow_cycles_size()
+function Tests.play_menu_click_on_right_arrow_cycles_difficulty()
   local game = Game.new()
   game:set_screen("play_menu")
-  game.selected_board_size = 5
+  game.selected_bot_difficulty = "easy"
+  game.play_menu_focus = { row = "actions", action = "start" }
 
   local ui = game:get_menu_ui("play_menu")
-  local size_row = ui.rows[1]
-  game:handle_play_menu_click(size_row.right_rect.x + 2, size_row.right_rect.y + 2)
+  local difficulty_row = ui.rows[1]
+  game:handle_play_menu_click(difficulty_row.right_rect.x + 2, difficulty_row.right_rect.y + 2)
 
-  assert_equal(game.selected_board_size, 7, "Clicking [>] on size row should advance the value")
-  assert_equal(game.play_menu_focus.row, "size", "Clicking on a cycler row should focus that row")
+  assert_equal(game.selected_bot_difficulty, "medium", "Clicking [>] on difficulty row should advance the value")
+  assert_equal(game.play_menu_focus.row, "difficulty", "Clicking on a cycler row should focus that row")
 end
 
 function Tests.play_menu_click_on_start_button_starts_game()
   local game = Game.new()
   game:set_screen("play_menu")
-  game.selected_board_size = 5
   game.selected_bot_difficulty = "easy"
 
   local ui = game:get_menu_ui("play_menu")
-  local actions_row = ui.rows[3]
+  local actions_row = ui.rows[2]
   local start_button = actions_row.buttons[2]
   game:handle_play_menu_click(start_button.x + 2, start_button.y + 2)
 
   assert_equal(game.screen, "playing", "Clicking Start should start the game")
-  assert_equal(game.state.width, 5, "Started game should use the selected board size")
+  assert_equal(game.state.width, 7, "Started game should use the 7x7 board")
   assert_equal(game.bot_difficulty, "easy", "Started game should use the selected difficulty")
 end
 
@@ -542,7 +520,7 @@ end
 
 function Tests.gamepad_dpad_moves_cursor_and_a_button_acts()
   local game = Game.new()
-  game:start_game(7, "hard")
+  game:start_game("hard")
 
   assert_equal(game.cursor_cell.x, 1, "Cursor should start on first player piece")
   assert_equal(game.cursor_cell.y, 1, "Cursor should start on first player piece")
@@ -568,7 +546,7 @@ end
 
 function Tests.gamepad_b_button_returns_to_main_menu_from_playing()
   local game = Game.new()
-  game:start_game(7, "hard")
+  game:start_game("hard")
   assert_equal(game.screen, "playing")
 
   game:gamepadpressed(nil, "b")
@@ -578,7 +556,7 @@ end
 
 function Tests.playing_keyboard_cursor_can_select_and_move()
   local game = Game.new()
-  game:start_game(7, "hard")
+  game:start_game("hard")
 
   assert_equal(game.cursor_cell.x, 1, "Cursor should start on first player piece")
   assert_equal(game.cursor_cell.y, 1, "Cursor should start on first player piece")
@@ -599,7 +577,7 @@ end
 function Tests.playing_cursor_navigation_plays_cursor_sound()
   local game = Game.new()
   local audio_spy, calls = make_audio_spy(false)
-  game:start_game(7, "hard")
+  game:start_game("hard")
   game.audio = audio_spy
 
   game:keypressed("right")
@@ -610,7 +588,7 @@ end
 function Tests.playing_piece_select_plays_select_sound()
   local game = Game.new()
   local audio_spy, calls = make_audio_spy(false)
-  game:start_game(7, "hard")
+  game:start_game("hard")
   game.audio = audio_spy
 
   game:keypressed("return")
@@ -620,7 +598,7 @@ end
 
 function Tests.playing_arrow_hold_repeats_cursor_movement()
   local game = Game.new()
-  game:start_game(7, "hard")
+  game:start_game("hard")
   local previous_love = love
 
   local ok, err = pcall(function()
@@ -763,7 +741,7 @@ end
 
 function Tests.start_game_adds_piece_spawn_animations()
   local game = Game.new()
-  game:start_game(7, "hard")
+  game:start_game("hard")
 
   assert_equal(count_pairs(game.piece_animations), 4, "Starting layout should animate four starting pieces")
   game:update_piece_animations(1.0)

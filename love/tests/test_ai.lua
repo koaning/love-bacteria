@@ -40,7 +40,7 @@ local function move_matches(a, b)
 end
 
 function Tests.easy_bot_returns_legal_move()
-  local state = level.load(7)
+  local state = level.load()
   state.current_player = "enemy"
   local legal_moves = rules.get_legal_moves(state, "enemy")
   local move = ai.choose_move(state, "enemy", "easy")
@@ -50,7 +50,7 @@ function Tests.easy_bot_returns_legal_move()
 end
 
 function Tests.easy_bot_prefers_grow_moves()
-  local state = level.load(7)
+  local state = level.load()
   state.current_player = "enemy"
   local move = ai.choose_move(state, "enemy", "easy")
 
@@ -58,7 +58,7 @@ function Tests.easy_bot_prefers_grow_moves()
 end
 
 function Tests.hard_bot_returns_legal_move()
-  local state = level.load(7)
+  local state = level.load()
   state.current_player = "enemy"
   local legal_moves = rules.get_legal_moves(state, "enemy")
   local move = ai.choose_move(state, "enemy", "hard")
@@ -68,7 +68,7 @@ function Tests.hard_bot_returns_legal_move()
 end
 
 function Tests.medium_bot_returns_legal_move()
-  local state = level.load(7)
+  local state = level.load()
   state.current_player = "enemy"
   local legal_moves = rules.get_legal_moves(state, "enemy")
   local move = ai.choose_move(state, "enemy", "medium")
@@ -78,7 +78,7 @@ function Tests.medium_bot_returns_legal_move()
 end
 
 function Tests.medium_bot_can_choose_greedy_and_random_moves_over_runs()
-  local state = level.load(7)
+  local state = level.load()
   state.current_player = "enemy"
   local legal_moves = rules.get_legal_moves(state, "enemy")
   local greedy_move = ai.choose_move(state, "enemy", "hard")
@@ -149,10 +149,10 @@ local function score_move_one_ply(state, side, move)
   local converted = (simulated.last_move and simulated.last_move.converted) or 0
 
   if simulated.winner == side then
-    return 100000 + converted
+    return 10000 + converted
   end
   if simulated.winner == opponent then
-    return -100000
+    return -10000
   end
 
   local my_count = board.count_cells(simulated, side)
@@ -208,7 +208,7 @@ function Tests.hard_bot_avoids_states_in_history()
   -- On the default 7x7 opening, capture Hard's preferred enemy move.
   -- Then ask again with that move's resulting state hashed into history.
   -- Hard must pick a different move to break the loop.
-  local state = level.load(7)
+  local state = level.load()
   state.current_player = "enemy"
 
   local first_move = ai.choose_move(state, "enemy", "hard")
@@ -226,7 +226,7 @@ end
 function Tests.bot_falls_back_when_every_move_repeats_history()
   -- If every legal move produces a state already in history, the AI must
   -- still return one of them (forced repeat) rather than nil.
-  local state = level.load(7)
+  local state = level.load()
   state.current_player = "enemy"
 
   local legal_moves = rules.get_legal_moves(state, "enemy")
