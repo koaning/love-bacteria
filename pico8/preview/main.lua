@@ -2,7 +2,7 @@
 --
 -- This is NOT PICO-8. It is a small stand-in that implements just enough of
 -- the PICO-8 API (128x128 screen, 16-colour palette, shapes, a 3x5 font,
--- buttons, coroutines, a tiny sfx synth) to play pico8/mossballs.p8 in a
+-- buttons, coroutines, a tiny sfx/music synth) to play pico8/mossballs.p8 in a
 -- browser through love.js when the real PICO-8 isn't available to export an
 -- HTML player. For the real thing: `make pico8` / PICO-8's own `export`.
 --
@@ -276,57 +276,18 @@ local function btnp(i)
 end
 
 -------------------------------------------------------------------------------
--- sfx: a little synth for the cart's __sfx__ section
+-- sfx + music: the cart's __sfx__/__music__ data played through synth.lua
 -------------------------------------------------------------------------------
+local synth = require("synth")
 local sources = {}
-local RATE = 22050
+local sfx_data = {}
+local music_pats = {}
+local song = nil -- { player = synth music, src = queueable source }
 
-local function wave(w, phase)
-  local p = phase % 1
-  if w == 0 then return math.sin(p * 2 * math.pi) end
-  if w == 1 then return 1 - 4 * math.abs(p - 0.5) end
-  if w == 2 then return 2 * p - 1 end
-  if w == 3 then return p < 0.5 and 1 or -1 end
-  if w == 4 then return p < 0.25 and 1 or -1 end
-  if w == 5 then return (1 - 4 * math.abs(p - 0.5)) * 0.6 + math.sin(p * 4 * math.pi) * 0.4 end
-  if w == 6 then return love.math.random() * 2 - 1 end
-  return math.sin(p * 2 * math.pi + math.sin(p * 6 * math.pi))
-end
-
-local function build_sfx(hex)
-  local speed = tonumber(hex:sub(3, 4), 16)
-  local notes = {}
-  for n = 0, 31 do
-    local s = hex:sub(9 + n * 5, 13 + n * 5)
-    notes[#notes + 1] = {
-      pitch = tonumber(s:sub(1, 2), 16),
-      wave = tonumber(s:sub(3, 3), 16) % 8,
-      vol = tonumber(s:sub(4, 4), 16),
-      fx = tonumber(s:sub(5, 5), 16),
-    }
-  end
-  local last = 0
-  for i, n in ipairs(notes) do
-    if n.vol > 0 then last = i end
-  end
-  if last == 0 or speed == 0 then return nil end
-
-  local per_note = 183 * speed
-  local data = love.sound.newSoundData(per_note * last, RATE, 16, 1)
-  local phase = 0
-  for i = 1, last do
-    local n = notes[i]
-    local freq = 65.41 * 2 ^ (n.pitch / 12)
-    for s = 0, per_note - 1 do
-      local t = s / per_note
-      local vol = n.vol / 7
-      if n.fx == 4 then vol = vol * t end
-      if n.fx == 5 then vol = vol * (1 - t) end
-      phase = phase + freq / RATE
-      data:setSample((i - 1) * per_note + s, wave(n.wave, phase) * vol * 0.25)
-    end
-  end
-  return love.audio.newSource(data, "static")
+local function to_source(samples)
+  local data = love.sound.newSoundData(#samples, synth.RATE, 16, 1)
+  for i = 1, #samples do data:setSample(i - 1, samples[i]) end
+  return data
 end
 
 local function sfx(n)
@@ -335,6 +296,29 @@ local function sfx(n)
     src:stop()
     src:play()
   end
+end
+
+-- music(n): stream pattern n onward (following loop/stop flags), rendering
+-- 4 steps (~0.7 s) at a time so no single frame stalls. music(-1) stops.
+local function music(n)
+  if song then song.src:stop() end
+  song = nil
+  n = n or 0
+  if n < 0 or not music_pats[n] then return end
+  local ok, src = pcall(love.audio.newQueueableSource, synth.RATE, 16, 1, 6)
+  if not ok then return end
+  song = { player = synth.new_music(sfx_data, music_pats, n, 4), src = src }
+end
+
+local function update_music()
+  if not song then return end
+  if song.src:getFreeBufferCount() > 0 then
+    local chunk = song.player.next_chunk()
+    if chunk then
+      song.src:queue(to_source(chunk))
+    end
+  end
+  if not song.src:isPlaying() then song.src:play() end
 end
 
 -------------------------------------------------------------------------------
@@ -400,7 +384,7 @@ local function make_env()
       end
     end,
     btn = btn, btnp = btnp,
-    sfx = sfx, music = function() end,
+    sfx = sfx, music = music,
     cartdata = function() end, dget = function() return 0 end, dset = function() end,
     printh = function(...) print(...) end,
     add = function(t, v) t[#t + 1] = v; return v end,
@@ -489,13 +473,14 @@ local function read_cart(path)
     return inc
   end)
 
-  local sfx_block = src:match("__sfx__\n(.-)\n__%w+__") or src:match("__sfx__\n(.*)$") or ""
-  local sfx_lines = {}
-  for l in sfx_block:gmatch("[^\n]+") do
-    sfx_lines[#sfx_lines + 1] = l
+  local function section(name)
+    local block = src:match("__" .. name .. "__\n(.-)\n__%w+__") or src:match("__" .. name .. "__\n(.*)$") or ""
+    local out = {}
+    for l in block:gmatch("[^\n]+") do out[#out + 1] = l end
+    return out
   end
 
-  return lua, sfx_lines
+  return lua, section("sfx"), section("music")
 end
 
 -------------------------------------------------------------------------------
@@ -522,10 +507,17 @@ function love.load()
   for i = 0, W * W - 1 do fb[i] = 0 end
   start_time = love.timer.getTime()
 
-  local lua, sfx_lines = read_cart("cart/mossballs.p8")
+  local lua, sfx_lines, music_lines = read_cart("cart/mossballs.p8")
   for i, hex in ipairs(sfx_lines) do
-    local ok, src = pcall(build_sfx, hex)
-    if ok then sources[i - 1] = src end
+    local s = synth.parse_sfx(hex)
+    sfx_data[i - 1] = s
+    local samples = synth.render_sfx(s)
+    if samples then
+      sources[i - 1] = love.audio.newSource(to_source(samples), "static")
+    end
+  end
+  for i, l in ipairs(music_lines) do
+    music_pats[i - 1] = synth.parse_music(l)
   end
 
   env = make_env()
@@ -548,6 +540,7 @@ function love.load()
 end
 
 function love.update(dt)
+  update_music()
   if crash_message then return end
   accumulator = math.min(accumulator + dt, step * 4)
   while accumulator >= step and not crash_message do

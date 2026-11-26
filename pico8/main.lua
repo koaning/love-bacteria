@@ -75,6 +75,9 @@ local logo_glyphs = {
 }
 
 local scene = "title"
+-- background music on channels 0-1 (mask 3); sfx get channels 2-3.
+-- title song at pattern 0, game song at 4 (see tools/music.lua)
+music(0, 0, 3)
 local diff_i = 2
 local theme_i = 1
 local menu_row = 1
@@ -227,6 +230,7 @@ local function start_game()
   state = rules_resolve_state(level_load())
   cur = { x = 1, y = 1 }
   scene = "play"
+  music(4, 500, 3)
 end
 
 local function target_at(x, y)
@@ -330,6 +334,7 @@ function _update60()
   if state.winner then
     if btnp(4) or btnp(5) then
       scene = "title"
+      music(0, 500, 3)
     end
     return
   end
