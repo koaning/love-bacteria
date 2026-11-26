@@ -27,3 +27,14 @@ browser player needs:
 
 - `/`: the cart running on `pico8/preview/`, a small PICO-8 stand-in player
 - `/official/`: also included when the `pico8` binary is installed (real PICO-8 HTML export)
+
+### GitHub Pages
+
+`.github/workflows/pages.yml` runs the tests, builds `dist/site/`, and publishes
+it to GitHub Pages on every push to `main` (or when run manually). To turn it on,
+go to **Settings → Pages → Source** and pick **GitHub Actions**. The game will be at
+`https://<user>.github.io/<repo>/`.
+
+GitHub Pages can't send the COOP/COEP headers the player needs, so
+`site/coi-serviceworker.js` ([coi-serviceworker](https://github.com/gzuidhof/coi-serviceworker),
+MIT) adds them in the browser. The first visit reloads the page once while it does this.
