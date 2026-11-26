@@ -39,6 +39,7 @@ end
 function board_set_cell(state, x, y, value)
   if board_in_bounds(state, x, y) then
     state.cells[y][x] = value
+    state.mob = nil
   end
 end
 
