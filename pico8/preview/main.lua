@@ -2,7 +2,7 @@
 --
 -- This is NOT PICO-8. It is a small stand-in that implements just enough of
 -- the PICO-8 API (128x128 screen, 16-colour palette, shapes, a 3x5 font,
--- buttons, coroutines, a tiny sfx synth) to play pico8/sporeline.p8 in a
+-- buttons, coroutines, a tiny sfx synth) to play pico8/mossballs.p8 in a
 -- browser through love.js when the real PICO-8 isn't available to export an
 -- HTML player. For the real thing: `make pico8` / PICO-8's own `export`.
 --
@@ -10,7 +10,7 @@
 -- VM instructions with a debug hook so stat(1) behaves roughly like the real
 -- console, which makes the bot "think" for a PICO-8-like number of frames.
 --
--- The cart is loaded from cart/sporeline.p8 inside this .love; its #include
+-- The cart is loaded from cart/mossballs.p8 inside this .love; its #include
 -- lines are resolved against cart/ (the build copies pico8/*.lua there).
 
 local W = 128
@@ -522,7 +522,7 @@ function love.load()
   for i = 0, W * W - 1 do fb[i] = 0 end
   start_time = love.timer.getTime()
 
-  local lua, sfx_lines = read_cart("cart/sporeline.p8")
+  local lua, sfx_lines = read_cart("cart/mossballs.p8")
   for i, hex in ipairs(sfx_lines) do
     local ok, src = pcall(build_sfx, hex)
     if ok then sources[i - 1] = src end

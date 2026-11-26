@@ -1,6 +1,6 @@
 # The mirror
 
-Sporeline ships as two games that share one brain:
+Mossballs ships as two games that share one brain:
 
 | LÖVE (`love/src/`) | PICO-8 (`pico8/`) | Mirrored? |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ The PICO-8 files are loaded into a sandbox with **only PICO-8 builtins**
 | LÖVE | PICO-8 |
 | --- | --- |
 | `AI.choose_move`, `Rules.apply_move`, … | `ai_choose_move`, `rules_apply_move`, … |
-| `require("src.x")` | `#include x.lua` in `sporeline.p8` |
+| `require("src.x")` | `#include x.lua` in `mossballs.p8` |
 | `for _, v in ipairs(t)` | `for v in all(t)` |
 | `t[#t + 1] = v` | `add(t, v)` |
 | `math.abs`, `math.floor` | `abs`, `flr` |

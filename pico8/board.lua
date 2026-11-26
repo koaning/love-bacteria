@@ -94,7 +94,7 @@ function board_same_cell(a, b)
   return a and b and a.x == b.x and a.y == b.y
 end
 
--- sporeline is always played on a 7x7 dish (both editions).
+-- mossballs is always played on a 7x7 dish (both editions).
 level_board_size = 7
 
 function level_load()

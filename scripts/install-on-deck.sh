@@ -1,20 +1,20 @@
 #!/bin/bash
-# Install or update Sporeline on a Steam Deck.
+# Install or update Mossballs on a Steam Deck.
 #
 # Run this in Desktop Mode's Konsole (first time) or over SSH from your Mac
 # (subsequent updates). Drops the AppImage into ~/Applications and prints the
 # one-time steps to register it with Steam.
 #
 # Usage:
-#   scripts/install-on-deck.sh path/to/Sporeline-x86_64.AppImage
+#   scripts/install-on-deck.sh path/to/Mossballs-x86_64.AppImage
 #   scripts/install-on-deck.sh --latest                  # pull from GitHub release
 
 set -euo pipefail
 
-APP_NAME="Sporeline"
+APP_NAME="Mossballs"
 GITHUB_REPO="koaning/love-bacteria"
 DEST_DIR="${HOME}/Applications"
-DEST_APPIMAGE="${DEST_DIR}/Sporeline-x86_64.AppImage"
+DEST_APPIMAGE="${DEST_DIR}/Mossballs-x86_64.AppImage"
 
 usage() {
   cat <<EOF
@@ -35,9 +35,9 @@ cleanup_source=false
 if [ "$1" = "--latest" ]; then
   echo "Fetching latest release from github.com/${GITHUB_REPO}..."
   url=$(curl -fsSL "https://api.github.com/repos/${GITHUB_REPO}/releases/latest" \
-    | grep -oE 'https://[^"]+Sporeline-x86_64\.AppImage' | head -1)
+    | grep -oE 'https://[^"]+Mossballs-x86_64\.AppImage' | head -1)
   if [ -z "${url}" ]; then
-    echo "No Sporeline-x86_64.AppImage asset found in the latest release." >&2
+    echo "No Mossballs-x86_64.AppImage asset found in the latest release." >&2
     echo "Trigger the Release workflow in Actions first, or tag a vX.Y.Z." >&2
     exit 1
   fi

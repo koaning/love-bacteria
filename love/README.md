@@ -1,4 +1,4 @@
-# Sporeline — LÖVE edition
+# Mossballs — LÖVE edition
 
 A small LÖVE 2D strategy game inspired by the bacteria puzzle from *The 7th Guest*.
 
@@ -39,13 +39,13 @@ Create distributable output:
 make build
 ```
 
-This creates `dist/sporeline.love` and, on macOS, a standalone app bundle at `dist/Sporeline.app`.
+This creates `dist/mossballs.love` and, on macOS, a standalone app bundle at `dist/Mossballs.app`.
 
 ## Steam Deck
 
-Sporeline runs on Steam Deck as a Non-Steam game via a Linux AppImage. Native gamepad support is built in (D-pad + ABXY + shoulders + Start), so the Deck's controls work with no Steam Input remapping.
+Mossballs runs on Steam Deck as a Non-Steam game via a Linux AppImage. Native gamepad support is built in (D-pad + ABXY + shoulders + Start), so the Deck's controls work with no Steam Input remapping.
 
-- Build the AppImage: push a git tag (CI attaches `Sporeline-x86_64.AppImage` to the release) or run `make appimage` on a Linux host.
+- Build the AppImage: push a git tag (CI attaches `Mossballs-x86_64.AppImage` to the release) or run `make appimage` on a Linux host.
 - Full walkthrough — one-time Deck setup over SSH, install script, and future updates from your Mac — is in [STEAMDECK.md](../STEAMDECK.md).
 
 ## Web Build (Playable Embed)
@@ -66,7 +66,7 @@ make web
 
 This creates `dist/web/` with:
 - `index.html` player page
-- `sporeline.love` game package
+- `mossballs.love` game package
 - header config files (`_headers`, `.htaccess`) required by `love.js`
 
 Deploy `dist/web/` to a host where you can set these headers:
@@ -78,7 +78,7 @@ Then embed in your blog with an iframe:
 
 ```html
 <iframe
-  src="https://games.your-domain.com/sporeline/"
+  src="https://games.your-domain.com/mossballs/"
   width="900"
   height="900"
   style="border:0;max-width:100%;"

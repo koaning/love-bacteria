@@ -14,7 +14,7 @@ check() {
   fi
 }
 
-echo "Checking Sporeline requirements:"
+echo "Checking Mossballs requirements:"
 check luajit "make test"
 if [ "$(uname -s)" = "Darwin" ] && [ -d /Applications/love.app ] && ! command -v love >/dev/null 2>&1; then
   echo "  ok       love     /Applications/love.app (not on PATH; 'make run' needs it there)"

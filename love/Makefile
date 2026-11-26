@@ -1,7 +1,7 @@
 .PHONY: test run love build fetch-lovejs web clean appimage
 
-APP_NAME := Sporeline
-APP_SLUG := sporeline
+APP_NAME := Mossballs
+APP_SLUG := mossballs
 DIST_DIR := dist
 LOVE_ARCHIVE := $(DIST_DIR)/$(APP_SLUG).love
 APP_BUNDLE := $(DIST_DIR)/$(APP_NAME).app
@@ -19,7 +19,7 @@ LOVE_APPIMAGE_URL := https://github.com/love2d/love/releases/download/$(LOVE_VER
 APPIMAGETOOL := $(DIST_DIR)/appimagetool-$(LINUX_ARCH).AppImage
 APPIMAGETOOL_URL := https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-$(LINUX_ARCH).AppImage
 APPIMAGE_SRC := build/appimage
-APPIMAGE_OUT := $(DIST_DIR)/Sporeline-$(LINUX_ARCH).AppImage
+APPIMAGE_OUT := $(DIST_DIR)/Mossballs-$(LINUX_ARCH).AppImage
 APPDIR := $(DIST_DIR)/squashfs-root
 
 test:
@@ -90,18 +90,18 @@ appimage: love
 	cp "$(LOVE_ARCHIVE)" "$(APPDIR)/$(APP_SLUG).love"
 	install -m 0755 "$(APPIMAGE_SRC)/AppRun" "$(APPDIR)/AppRun"
 	rm -f "$(APPDIR)/love.desktop"
-	cp "$(APPIMAGE_SRC)/sporeline.desktop" "$(APPDIR)/sporeline.desktop"
-	@if [ -f "$(APPIMAGE_SRC)/sporeline.png" ]; then \
+	cp "$(APPIMAGE_SRC)/mossballs.desktop" "$(APPDIR)/mossballs.desktop"
+	@if [ -f "$(APPIMAGE_SRC)/mossballs.png" ]; then \
 		rm -f "$(APPDIR)/love.svg" "$(APPDIR)/love.png"; \
-		cp "$(APPIMAGE_SRC)/sporeline.png" "$(APPDIR)/sporeline.png"; \
+		cp "$(APPIMAGE_SRC)/mossballs.png" "$(APPDIR)/mossballs.png"; \
 	elif [ -f "$(APPDIR)/love.svg" ]; then \
-		mv "$(APPDIR)/love.svg" "$(APPDIR)/sporeline.svg"; \
+		mv "$(APPDIR)/love.svg" "$(APPDIR)/mossballs.svg"; \
 	fi
 	@rm -f "$(APPDIR)/.DirIcon"
-	@if [ -f "$(APPDIR)/sporeline.png" ]; then \
-		ln -s sporeline.png "$(APPDIR)/.DirIcon"; \
-	elif [ -f "$(APPDIR)/sporeline.svg" ]; then \
-		ln -s sporeline.svg "$(APPDIR)/.DirIcon"; \
+	@if [ -f "$(APPDIR)/mossballs.png" ]; then \
+		ln -s mossballs.png "$(APPDIR)/.DirIcon"; \
+	elif [ -f "$(APPDIR)/mossballs.svg" ]; then \
+		ln -s mossballs.svg "$(APPDIR)/.DirIcon"; \
 	fi
 	APPIMAGE_EXTRACT_AND_RUN=1 "./$(APPIMAGETOOL)" "$(APPDIR)" "$(APPIMAGE_OUT)"
 	rm -rf "$(APPDIR)"

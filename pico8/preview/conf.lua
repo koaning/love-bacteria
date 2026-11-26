@@ -1,7 +1,7 @@
 function love.conf(t)
-  t.identity = "sporeline-p8-preview"
+  t.identity = "mossballs-p8-preview"
   t.version = "11.5"
-  t.window.title = "Sporeline (PICO-8 preview)"
+  t.window.title = "Mossballs (PICO-8 preview)"
   t.window.width = 512
   t.window.height = 512
   t.window.resizable = true

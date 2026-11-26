@@ -1,4 +1,4 @@
-# Playing Sporeline on Steam Deck
+# Playing Mossballs on Steam Deck
 
 The goal: **one short Desktop Mode visit to set things up, then everything else from your Mac over SSH**. After the initial setup, you never have to leave Gaming Mode on the Deck again — you push new AppImages with `scp` or the install script, and the existing Steam shortcut picks them up.
 
@@ -6,7 +6,7 @@ The goal: **one short Desktop Mode visit to set things up, then everything else 
 
 ## TL;DR
 
-1. **On your Mac**: tag a release (or click "Run workflow" in Actions) → GitHub builds `Sporeline-x86_64.AppImage`.
+1. **On your Mac**: tag a release (or click "Run workflow" in Actions) → GitHub builds `Mossballs-x86_64.AppImage`.
 2. **On the Deck (once, in Desktop Mode)**: set sudo password, enable SSH, run `scripts/install-on-deck.sh --latest`, add the AppImage to Steam via the UI.
 3. **From then on (from your Mac)**: `ssh deck@steamdeck 'bash -s -- --latest' < scripts/install-on-deck.sh` to pull and install new builds over Tailscale. No Desktop Mode needed.
 
@@ -23,7 +23,7 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-…or go to **Actions → Release → Run workflow** on GitHub. The workflow runs the test suite, then `make appimage`, and attaches `Sporeline-x86_64.AppImage` to the GitHub Release (and also uploads it as a workflow artifact).
+…or go to **Actions → Release → Run workflow** on GitHub. The workflow runs the test suite, then `make appimage`, and attaches `Mossballs-x86_64.AppImage` to the GitHub Release (and also uploads it as a workflow artifact).
 
 ### Locally on a Linux host
 
@@ -31,7 +31,7 @@ git push origin v0.1.0
 make appimage
 ```
 
-Produces `dist/Sporeline-x86_64.AppImage` (built in `love/dist/` and copied up to the root). Requires `curl`, `zip`, and a Linux host — the Makefile refuses on macOS.
+Produces `dist/Mossballs-x86_64.AppImage` (built in `love/dist/` and copied up to the root). Requires `curl`, `zip`, and a Linux host — the Makefile refuses on macOS.
 
 ---
 
@@ -122,24 +122,24 @@ Host steamdeck
 After that, `ssh steamdeck` is enough. To inspect the Deck's numeric Tailscale
 IPv4 address anyway, run `tailscale ip -4` on the Deck.
 
-Still in Konsole, install Sporeline with the helper script. Either copy the script over (USB, Syncthing, or clone this repo on the Deck), or paste its contents inline:
+Still in Konsole, install Mossballs with the helper script. Either copy the script over (USB, Syncthing, or clone this repo on the Deck), or paste its contents inline:
 
 ```bash
 # From a clone of the repo on the Deck:
 ./scripts/install-on-deck.sh --latest
 ```
 
-This downloads the latest `Sporeline-x86_64.AppImage` from the GitHub release, drops it in `~/Applications/`, `chmod +x`'s it, and prints the final registration steps:
+This downloads the latest `Mossballs-x86_64.AppImage` from the GitHub release, drops it in `~/Applications/`, `chmod +x`'s it, and prints the final registration steps:
 
 1. Open **Steam** (Desktop client).
-2. In the **top menu bar**: **Games → Add a Non-Steam Game to My Library…** *(also reachable from the bottom-left **+ ADD A GAME** button)*. In the dialog that opens, click **BROWSE…** and navigate to `/home/deck/Applications/Sporeline-x86_64.AppImage`. If the file isn't visible, switch the file-type filter in the bottom-right from "Applications" to **"All Files"** — `.AppImage` isn't in the default filter.
-3. Tick Sporeline, click **Add Selected Programs**.
+2. In the **top menu bar**: **Games → Add a Non-Steam Game to My Library…** *(also reachable from the bottom-left **+ ADD A GAME** button)*. In the dialog that opens, click **BROWSE…** and navigate to `/home/deck/Applications/Mossballs-x86_64.AppImage`. If the file isn't visible, switch the file-type filter in the bottom-right from "Applications" to **"All Files"** — `.AppImage` isn't in the default filter.
+3. Tick Mossballs, click **Add Selected Programs**.
 4. **Important — disable Proton:** right-click the new shortcut → **Properties** → **Compatibility** tab → make sure "Force the use of a specific Steam Play compatibility tool" is **unchecked**. If a dropdown appears below, set it to **"None"**. Proton will try to run the Linux AppImage through Wine and it will exit silently — this is the #1 cause of "game appears in library but won't start."
 5. Confirm **Shortcut** tab shows:
-   - **Target:** `"/home/deck/Applications/Sporeline-x86_64.AppImage"` (with quotes)
+   - **Target:** `"/home/deck/Applications/Mossballs-x86_64.AppImage"` (with quotes)
    - **Start In:** `"/home/deck/Applications/"` (with quotes)
    - **Launch Options:** empty
-6. (Optional) rename the shortcut to "Sporeline".
+6. (Optional) rename the shortcut to "Mossballs".
 
 Return to Gaming Mode via the **Return to Gaming Mode** desktop icon.
 
@@ -153,7 +153,7 @@ Once the Steam shortcut exists, upgrades are remote-only. From your Mac:
 
 ```bash
 # Option A: push a freshly built AppImage
-scp dist/Sporeline-x86_64.AppImage deck@steamdeck:~/Applications/
+scp dist/Mossballs-x86_64.AppImage deck@steamdeck:~/Applications/
 
 # Option B: ask the Deck to pull the latest release itself
 ssh deck@steamdeck 'curl -fsSL https://raw.githubusercontent.com/koaning/love-bacteria/main/scripts/install-on-deck.sh | bash -s -- --latest'
@@ -174,13 +174,13 @@ The archive hook uses SSH batch mode, so configure key-based authentication
 first. It also requires the GitHub CLI to be authenticated and the current
 branch to be pushed, because GitHub Actions builds the Linux AppImage.
 
-Gaming Mode's existing Sporeline shortcut points at `~/Applications/Sporeline-x86_64.AppImage` — when you overwrite that file, the next launch runs the new build.
+Gaming Mode's existing Mossballs shortcut points at `~/Applications/Mossballs-x86_64.AppImage` — when you overwrite that file, the next launch runs the new build.
 
 ---
 
 ## 4. Custom library artwork
 
-In Gaming Mode: select Sporeline in your library → press **Y** (Manage shortcut) → **Set artwork** for each slot.
+In Gaming Mode: select Mossballs in your library → press **Y** (Manage shortcut) → **Set artwork** for each slot.
 
 Or drop PNGs into `~/.steam/steam/userdata/<your-steam-id>/config/grid/` on the Deck with these names:
 
@@ -224,7 +224,7 @@ Native gamepad support is built into the game, so the Deck's controls work witho
 **"How do I verify the AppImage itself works (independent of Steam)?"** From **Konsole on the Deck** (not SSH — see below), run:
 
 ```bash
-~/Applications/Sporeline-x86_64.AppImage
+~/Applications/Mossballs-x86_64.AppImage
 ```
 
 The Love window should appear. If that works but Steam launch fails, you know the wrapper/Proton is the problem, not the AppImage.
@@ -234,12 +234,12 @@ The Love window should appear. If that works but Steam launch fails, you know th
 **"`AppRun: /tmp/.mount_.../usr/bin/love: No such file or directory` on launch."** You're on a pre-v0.1.1 build. The AppRun had the wrong path for the bundled LÖVE binary. Pull v0.1.1 or later:
 
 ```bash
-curl -fsSL -o ~/Applications/Sporeline-x86_64.AppImage \
-  https://github.com/koaning/love-bacteria/releases/latest/download/Sporeline-x86_64.AppImage
-chmod +x ~/Applications/Sporeline-x86_64.AppImage
+curl -fsSL -o ~/Applications/Mossballs-x86_64.AppImage \
+  https://github.com/koaning/love-bacteria/releases/latest/download/Mossballs-x86_64.AppImage
+chmod +x ~/Applications/Mossballs-x86_64.AppImage
 ```
 
-**"AppImage won't launch at all"** — confirm it's executable (`ls -l ~/Applications/Sporeline-x86_64.AppImage` — should start with `-rwx`). SteamOS ships FUSE, so no extra runtime is needed.
+**"AppImage won't launch at all"** — confirm it's executable (`ls -l ~/Applications/Mossballs-x86_64.AppImage` — should start with `-rwx`). SteamOS ships FUSE, so no extra runtime is needed.
 
 **"Controller does nothing"** — launch through Steam, not directly from Dolphin or Konsole. Gamepad events only arrive when SDL sees Steam Input attaching a virtual controller.
 

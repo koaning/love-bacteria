@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Mossballs
+Comment=A LÖVE 2D marimo strategy game inspired by the bacteria puzzle from The 7th Guest
+Exec=AppRun
+Icon=mossballs
+Terminal=false
+Categories=Game;StrategyGame;
