@@ -36,6 +36,9 @@ local draw_pal = {}
 local pen = 6
 local cursor_x, cursor_y = 0, 0
 local camera_x, camera_y = 0, 0
+local fill_pat = 0
+local fill_trans = false
+local clip_x0, clip_y0, clip_x1, clip_y1 = 0, 0, W - 1, W - 1
 
 local function reset_pal()
   for i = 0, 15 do
@@ -43,10 +46,31 @@ local function reset_pal()
   end
 end
 
+local function pset_shape(x, y, c)
+  x = math.floor(x - camera_x)
+  y = math.floor(y - camera_y)
+  if x >= clip_x0 and x <= clip_x1 and y >= clip_y0 and y <= clip_y1 then
+    local col = c or pen
+    if fill_pat ~= 0 then
+      local bit_idx = (3 - (y % 4)) * 4 + (3 - (x % 4))
+      local on = math.floor(fill_pat / (2 ^ bit_idx)) % 2 == 1
+      if on then
+        if fill_trans then return end
+        col = math.floor(col / 16) % 16
+      else
+        col = col % 16
+      end
+    else
+      col = col % 16
+    end
+    fb[y * W + x] = draw_pal[math.floor(col) % 16]
+  end
+end
+
 local function pset(x, y, c)
   x = math.floor(x - camera_x)
   y = math.floor(y - camera_y)
-  if x >= 0 and x < W and y >= 0 and y < W then
+  if x >= clip_x0 and x <= clip_x1 and y >= clip_y0 and y <= clip_y1 then
     fb[y * W + x] = draw_pal[math.floor(c or pen) % 16]
   end
 end
@@ -54,7 +78,7 @@ end
 local function hline(x0, x1, y, c)
   if x0 > x1 then x0, x1 = x1, x0 end
   for x = math.floor(x0), math.floor(x1) do
-    pset(x, y, c)
+    pset_shape(x, y, c)
   end
 end
 
@@ -146,8 +170,8 @@ local function rect(x0, y0, x1, y1, c)
   hline(x0, x1, y1, c)
   if y0 > y1 then y0, y1 = y1, y0 end
   for y = math.floor(y0), math.floor(y1) do
-    pset(x0, y, c)
-    pset(x1, y, c)
+    pset_shape(x0, y, c)
+    pset_shape(x1, y, c)
   end
 end
 
@@ -157,7 +181,7 @@ local function line(x0, y0, x1, y1, c)
   local sx, sy = x0 < x1 and 1 or -1, y0 < y1 and 1 or -1
   local err = dx + dy
   while true do
-    pset(x0, y0, c)
+    pset_shape(x0, y0, c)
     if x0 == x1 and y0 == y1 then break end
     local e2 = 2 * err
     if e2 >= dy then err = err + dy; x0 = x0 + sx end
@@ -204,10 +228,10 @@ end
 
 local function circ(cx, cy, r, c)
   circ_points(cx, cy, r or 4, function(px, py, x, y)
-    pset(px + x, py + y, c); pset(px - x, py + y, c)
-    pset(px + x, py - y, c); pset(px - x, py - y, c)
-    pset(px + y, py + x, c); pset(px - y, py + x, c)
-    pset(px + y, py - x, c); pset(px - y, py - x, c)
+    pset_shape(px + x, py + y, c); pset_shape(px - x, py + y, c)
+    pset_shape(px + x, py - y, c); pset_shape(px - x, py - y, c)
+    pset_shape(px + y, py + x, c); pset_shape(px - y, py + x, c)
+    pset_shape(px + y, py - x, c); pset_shape(px - y, py - x, c)
   end)
 end
 
@@ -359,7 +383,22 @@ local function make_env()
     pal = function(a, b)
       if a == nil then reset_pal() else draw_pal[a % 16] = b % 16 end
     end,
-    fillp = function() end, palt = function() end, clip = function() end,
+    fillp = function(p)
+      p = p or 0
+      fill_trans = (p - math.floor(p)) >= 0.5
+      fill_pat = math.floor(p) % 65536
+    end,
+    palt = function() end,
+    clip = function(x, y, w, h)
+      if x == nil then
+        clip_x0, clip_y0, clip_x1, clip_y1 = 0, 0, W - 1, W - 1
+      else
+        clip_x0 = math.max(0, math.floor(x))
+        clip_y0 = math.max(0, math.floor(y))
+        clip_x1 = math.min(W - 1, math.floor(x + w - 1))
+        clip_y1 = math.min(W - 1, math.floor(y + h - 1))
+      end
+    end,
     btn = btn, btnp = btnp,
     sfx = sfx, music = function() end,
     cartdata = function() end, dget = function() return 0 end, dset = function() end,

@@ -19,7 +19,7 @@ export a standalone `.p8.png`/HTML, load the cart in PICO-8 and `save` /
 
 ## Controls
 
-- Title: ⬅️➡️ change bot difficulty, 🅾️ start. The board is always 7×7.
+- Title: ⬆️⬇️ choose bot/theme, ⬅️➡️ change setting, 🅾️ start. The board is always 7×7.
 - Game: ⬆️⬇️⬅️➡️ move the cursor, 🅾️ select a bacterium and then a target, ❎ deselect.
   Dots are grow targets, rings are jump targets.
 
