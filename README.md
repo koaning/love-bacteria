@@ -1,73 +1,71 @@
 # Mossballs
 
-A small marimo strategy game, inspired by the bacteria puzzle from *The 7th
-Guest*. It comes in two editions that share the same AI:
+A bacteria strategy game for **PICO-8** (128×128, 16 colours, 3 sound effects),
+inspired by the bacteria puzzle from *The 7th Guest*.
 
-| | Edition | Run |
-| --- | --- | --- |
-| [`love/`](love/README.md) | LÖVE 11.5 version with the ambitious graphics: shaders, music, Steam Deck, web build | `make run` |
-| [`pico8/`](pico8/README.md) | PICO-8 cart, 128×128, 3 sound effects | `make pico8` |
+| Cartridge | Gameplay |
+| --- | --- |
+| ![PICO-8 cartridge](docs/screenshots/pico8-cart.png) | ![PICO-8 gameplay](docs/screenshots/pico8.png) |
 
-| LÖVE | PICO-8 | PICO-8 cartridge |
-| --- | --- | --- |
-| ![LÖVE edition](docs/screenshots/love.png) | ![PICO-8 edition](docs/screenshots/pico8.png) | ![PICO-8 cartridge](docs/screenshots/pico8-cart.png) |
+## Play
 
-The two AIs are **twin files**, `love/src/ai.lua` and `pico8/ai.lua`. A
-"mirror match" test keeps them honest: both play the same seeded games and
-must pick the same move every turn. See [MIRROR.md](MIRROR.md).
-
-## Play both in a browser
+### In PICO-8
 
 ```bash
-make fetch-lovejs   # once: download the love.js runtime
+make pico8    # runs: pico8 -run pico8/mossballs.p8 (set PICO8=/path/to/pico8 if needed)
+```
+
+### In a browser (no PICO-8 binary required)
+
+```bash
+make fetch-lovejs   # once: download the love.js runtime for the preview player
 make serve          # build dist/site and serve it on :8000 (PORT=9000 to change)
 ```
 
-`make serve` builds one static site, `dist/site/`:
+`make serve` builds `dist/site/` and serves it with the COOP/COEP headers the
+browser player needs:
 
-- `/`: landing page with both editions
-- `/love/`: the LÖVE edition via love.js
-- `/pico8/`: the cart on the **PICO-8 preview player** (`pico8/preview/`), a
-  small PICO-8 stand-in written in LÖVE, also via love.js
-- `/pico8-official/`: added only when the `pico8` binary is installed
-  (`PICO8=/path/to/pico8`). It's the real PICO-8 HTML export.
+- `/`: the cart running on `pico8/preview/`, a small PICO-8 stand-in player
+- `/official/`: also included when the `pico8` binary is installed (real PICO-8 HTML export)
 
-`tools/serve.py` sends the COOP/COEP headers love.js needs. On an exe.dev VM
-the site is at `https://<vm>.exe.xyz:8000/`.
+On an exe.dev VM the site is available at `https://<vm>.exe.xyz:8000/`.
 
-## Commands (repo root)
+## Controls
+
+- **Title**: ⬆️⬇️ choose bot/theme, ⬅️➡️ change setting, 🅾️ start
+- **Game**: ⬆️⬇️⬅️➡️ move cursor, 🅾️ select a spore and then a target, ❎ deselect
+  - Dots are grow targets; rings are jump targets.
+
+## Commands
 
 ```bash
-make test     # LÖVE unit tests + mirror match + cart smoke test + token meter
-              #   (same as `luajit tests/run.lua`, which is what CI runs)
-make mirror   # just the LÖVE-vs-PICO-8 AI parity games
-make run      # play the LÖVE edition
-make pico8    # open the cart in PICO-8 (set PICO8=/path/to/pico8 if needed)
-make serve    # both editions on a local web page (see above)
-make appimage # LÖVE Steam Deck build → dist/ (also build, web, …)
+make test          # brain unit tests + cart smoke test + 8192-token budget meter
+                   #   (same as `luajit tests/run.lua`, which is what CI runs)
+make pico8         # open pico8/mossballs.p8 in PICO-8
+make pico8-preview # package dist/mossballs-p8.love for desktop preview
+make serve         # build and serve the browser preview on :8000
 ```
 
-Tests need `luajit`. The web build also needs `zip` and `curl`.
+Tests need `luajit`. The browser preview build also needs `zip` and `curl`.
 
 ## Layout
 
 ```
-love/        LÖVE edition (main.lua, src/, assets/, tests/, web/, build/)
-pico8/       PICO-8 edition (mossballs.p8 + #included .lua files)
-pico8/preview/  PICO-8 preview player (LÖVE) used for the web build
-site/        landing page + PICO-8 page templates for `make site`
-tests/       run.lua (runs everything), mirror_match.lua, cart_smoke.lua
-tools/       pico8_env.lua (PICO-8 sandbox for LuaJIT), p8tokens.lua, serve.py
-docs/        screenshots
-scripts/     Steam Deck install/update helpers (see STEAMDECK.md)
-MIRROR.md    how the two AIs stay in sync
+pico8/          PICO-8 cart (mossballs.p8 + #included board/rules/ai/main .lua)
+pico8/preview/  minimal PICO-8 stand-in player used for the browser preview
+site/           HTML template + love.js runtime cache for `make site`
+tests/          run.lua, test_brain.lua, cart_smoke.lua
+tools/          pico8_env.lua (PICO-8 sandbox for LuaJIT), p8tokens.lua, serve.py
+docs/           screenshots
 ```
 
 ## Rules
 
-- Both editions play on a 7×7 board, starting with one bacterium per side in each pair of opposite corners.
-- Grow: place a new bacterium in any adjacent cell (diagonals included).
-- Jump: move a bacterium exactly 2 cells orthogonally, leaving the origin empty.
-- After either move, adjacent enemy bacteria around the destination convert.
+- Played on a 7×7 dish, starting with one spore per side in opposite corners.
+- **Grow**: place a new spore in any adjacent cell (diagonals included).
+- **Jump**: leap a spore exactly 2 cells orthogonally, leaving the origin empty.
+- After either move, adjacent enemy spores around the destination convert.
+- Adjacent same-side spores merge into living 3D organic blobs with shared eyes;
+  competing frontlines press cleanly against each other.
 - Eliminate the other side to win; if nobody can move, the bigger colony wins.
 - A side with no legal moves passes automatically.

@@ -1,4 +1,4 @@
-# Mossballs — PICO-8 edition
+# Mossballs — PICO-8 cart
 
 | Cartridge | Gameplay |
 | --- | --- |
@@ -10,12 +10,12 @@ pico8 -run mossballs.p8     # or `make pico8` from the repo root
 
 The cart is `mossballs.p8`, which `#include`s:
 
-| File | What | Mirrors |
-| --- | --- | --- |
-| `board.lua` | board state, cloning, starting layout | `love/src/board.lua`, `level.lua` |
-| `rules.lua` | moves, conversion, passing, winner | `love/src/rules.lua` |
-| `ai.lua` | easy / medium / hard bot | `love/src/ai.lua` |
-| `main.lua` | title menu, 7×7 board, cursor, drawing, sfx; the look follows [Mossballs](https://koaning.io/posts/mossballs/) | — (PICO-8 only) |
+| File | What |
+| --- | --- |
+| `board.lua` | board state, cloning, starting layout |
+| `rules.lua` | moves, conversion, passing, winner |
+| `ai.lua` | easy / medium / hard bot |
+| `main.lua` | title menu, 7×7 3D organic blob renderer, animations, HUD, sfx |
 
 Edit the `.lua` files in any editor. PICO-8 picks them up on `run`. To
 export a standalone `.p8.png`/HTML, load the cart in PICO-8 and `save` /
@@ -23,18 +23,15 @@ export a standalone `.p8.png`/HTML, load the cart in PICO-8 and `save` /
 
 ## Controls
 
-- Title: ⬆️⬇️ choose bot/theme, ⬅️➡️ change setting, 🅾️ start. The board is always 7×7.
-- Game: ⬆️⬇️⬅️➡️ move the cursor, 🅾️ select a bacterium and then a target, ❎ deselect.
+- Title: ⬆️⬇️ choose bot/theme, ⬅️➡️ change setting, 🅾️ start.
+- Game: ⬆️⬇️⬅️➡️ move the cursor, 🅾️ select a spore and then a target, ❎ deselect.
   Dots are grow targets, rings are jump targets.
 
 ## Notes
 
 - The bot runs in a coroutine and calls `ai_tick()`, which yields whenever
   the frame's CPU is ~80% used, so the screen keeps animating while it thinks.
-- Both editions always play on a 7×7 board.
-- Hard is a 2-ply minimax, the same as LÖVE, so it may think for a while on
-  PICO-8's CPU.
-- Before changing `board.lua`, `rules.lua` or `ai.lua`, read `../MIRROR.md`.
+- Hard is a 2-ply alpha-beta minimax search.
 
 ## Preview player (no PICO-8 needed)
 
@@ -45,7 +42,7 @@ buttons, coroutines, and a tiny synth for the `__sfx__` section.
 
 ```bash
 make pico8-preview && love dist/mossballs-p8.love   # desktop
-make serve                                          # browser, at /pico8/
+make serve                                          # browser
 ```
 
 It counts Lua VM instructions against PICO-8's ~4M/sec budget, so `stat(1)`

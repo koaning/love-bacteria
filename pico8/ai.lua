@@ -1,18 +1,12 @@
--- ai.lua (pico-8 copy)
--- mirror of love/src/ai.lua. see MIRROR.md before editing.
+-- ai.lua
+-- easy / medium / hard bots for mossballs.
 --
--- this is the file we care about keeping in lockstep. every
--- function below has a same-named twin in love/src/ai.lua
--- (ai_choose_move <-> AI.choose_move, etc). `make parity`
--- plays both brains against each other and fails on the first
--- move where they disagree.
---
--- pico-8 differences (and only these):
+-- pico-8 notes:
 --   * numbers are 16.16 fixed point, so scores stay < 32768
 --   * abs()/rnd()/flr()/add()/all() instead of math./table.
 --   * ai_tick() is called in the hot loops so the cart can
 --     yield() from a coroutine and keep animating while the
---     bot thinks. the desktop shim makes it a no-op.
+--     bot thinks. the test sandbox makes it a no-op.
 
 local hard_search_depth = 2
 local infinity = 32000

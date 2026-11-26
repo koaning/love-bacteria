@@ -1,8 +1,7 @@
--- board.lua (pico-8 copy)
--- mirror of love/src/board.lua. see MIRROR.md before editing.
+-- board.lua
 -- written in the lua subset that both pico-8 and luajit accept
--- (no +=, no !=, no ?, no math./table./string.) so the parity
--- test can load it on a desktop.
+-- (no +=, no !=, no ?, no math./table./string.) so the test
+-- suite can run it on a desktop.
 
 function board_new_state(width, height)
   local cells = {}

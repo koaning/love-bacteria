@@ -1,6 +1,5 @@
--- rules.lua (pico-8 copy)
--- mirror of love/src/rules.lua. see MIRROR.md before editing.
--- status_text strings are left out: the cart draws its own hud.
+-- rules.lua
+-- legal moves, conversion, automatic passing, and win detection.
 
 local adjacent_offsets = {
   { x = -1, y = -1 },
