@@ -62,7 +62,8 @@ site: pico8-preview
 	done
 	rm -rf "$(SITE)"
 	mkdir -p "$(SITE)"
-	cp site/index.html "$(SITE)/index.html"
+	cp site/index.html site/coi-serviceworker.js "$(SITE)/"
+	touch "$(SITE)/.nojekyll"
 	cp "$(DIST)/mossballs-p8.love" "$(SITE)/"
 	@for f in $(LOVEJS_FILES); do \
 		mkdir -p "$(SITE)/$$(dirname $$f)"; \
