@@ -14,7 +14,7 @@ local function boot(seed)
   local pressed = {}
   local cpu = 0
 
-  for _, name in ipairs({ "cls", "rectfill", "rect", "circfill", "circ", "line", "print", "sfx", "ovalfill", "pset", "fillp", "clip", "pal" }) do
+  for _, name in ipairs({ "cls", "rectfill", "rect", "circfill", "circ", "line", "print", "sfx", "music", "ovalfill", "pset", "fillp", "clip", "pal" }) do
     rawset(env, name, noop)
   end
   rawset(env, "del", function(t, v)

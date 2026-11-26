@@ -1,4 +1,4 @@
-.PHONY: test unit smoke tokens run pico8 pico8-preview fetch-lovejs site serve clean
+.PHONY: test unit smoke tokens music music-check run pico8 pico8-preview fetch-lovejs site serve clean
 
 PICO8 ?= pico8
 PORT ?= 8000
@@ -10,8 +10,9 @@ LOVEJS_DIR := site/lovejs
 LOVEJS_BASE := https://raw.githubusercontent.com/2dengine/love.js/main
 LOVEJS_FILES := player.js lua/normalize1.lua lua/normalize2.lua 11.5/love.js 11.5/love.wasm
 
-# Everything CI checks: brain unit tests, cart smoke test, and PICO-8 token budget.
-test: unit smoke tokens
+# Everything CI checks: brain unit tests, cart smoke test, PICO-8 token
+# budget, and that the cart's music data matches tools/music.lua.
+test: unit smoke tokens music-check
 
 unit:
 	luajit tests/test_brain.lua
@@ -23,6 +24,13 @@ smoke:
 # Approximate PICO-8 token count for the cart (limit 8192).
 tokens:
 	luajit tools/p8tokens.lua
+
+# Compile the background-music score in tools/music.lua into the cart.
+music:
+	luajit tools/music.lua
+
+music-check:
+	luajit tools/music.lua --check
 
 run: pico8
 
@@ -44,7 +52,7 @@ fetch-lovejs:
 pico8-preview:
 	rm -rf "$(P8_STAGE)"
 	mkdir -p "$(P8_STAGE)/cart"
-	cp pico8/preview/main.lua pico8/preview/conf.lua "$(P8_STAGE)/"
+	cp pico8/preview/main.lua pico8/preview/conf.lua pico8/preview/synth.lua "$(P8_STAGE)/"
 	cp pico8/mossballs.p8 pico8/*.lua "$(P8_STAGE)/cart/"
 	rm -f "$(DIST)/mossballs-p8.love"
 	cd "$(P8_STAGE)" && zip -9 -q -r ../mossballs-p8.love .
