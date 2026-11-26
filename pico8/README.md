@@ -1,5 +1,9 @@
 # Sporeline — PICO-8 edition
 
+| Cartridge | Gameplay |
+| --- | --- |
+| ![PICO-8 cartridge](../docs/screenshots/pico8-cart.png) | ![PICO-8 gameplay](../docs/screenshots/pico8.png) |
+
 ```bash
 pico8 -run sporeline.p8     # or `make pico8` from the repo root
 ```

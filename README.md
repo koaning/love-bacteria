@@ -8,9 +8,9 @@ Guest*. It comes in two editions that share the same AI:
 | [`love/`](love/README.md) | LÖVE 11.5 version with the ambitious graphics: shaders, music, Steam Deck, web build | `make run` |
 | [`pico8/`](pico8/README.md) | PICO-8 cart, 128×128, 3 sound effects | `make pico8` |
 
-| LÖVE | PICO-8 |
-| --- | --- |
-| ![LÖVE edition](docs/screenshots/love.png) | ![PICO-8 edition](docs/screenshots/pico8.png) |
+| LÖVE | PICO-8 | PICO-8 cartridge |
+| --- | --- | --- |
+| ![LÖVE edition](docs/screenshots/love.png) | ![PICO-8 edition](docs/screenshots/pico8.png) | ![PICO-8 cartridge](docs/screenshots/pico8-cart.png) |
 
 The two AIs are **twin files**, `love/src/ai.lua` and `pico8/ai.lua`. A
 "mirror match" test keeps them honest: both play the same seeded games and
