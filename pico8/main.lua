@@ -76,7 +76,7 @@ local logo_glyphs = {
 
 local scene = "title"
 -- background music on channels 0-1 (mask 3); sfx get channels 2-3.
--- title song at pattern 0, game song at 4 (see tools/music.lua)
+-- title song at pattern 0, game song at 4 (see tools/scores.lua)
 music(0, 0, 3)
 local diff_i = 2
 local theme_i = 1

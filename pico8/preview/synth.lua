@@ -1,4 +1,4 @@
--- Tiny PICO-8-ish synth for the preview player and tools/music.lua.
+-- Tiny PICO-8-ish synth for the preview player and tools/sfx.lua.
 --
 -- Plain Lua 5.1 (no LÖVE), so it runs inside love.js and under luajit.
 -- It approximates PICO-8's 8 waveforms and the fade/vibrato/slide effects;

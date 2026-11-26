@@ -21,4 +21,4 @@ jobs:
           sudo apt-get install -y luajit
 
       - name: Run tests
-        run: luajit tests/run.lua
+        run: make test

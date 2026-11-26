@@ -14,10 +14,11 @@ check() {
   fi
 }
 
-echo "Checking Mossballs requirements:"
+echo "Checking requirements:"
 check luajit "make test"
 check zip "make pico8-preview / site"
 check curl "make fetch-lovejs"
+check love "make screenshots (optional)"
 
 if [ "$missing" -ne 0 ]; then
   echo "Some tools are missing; related make targets will fail until they are installed."

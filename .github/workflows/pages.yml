@@ -1,7 +1,8 @@
 name: Pages
 
 # Builds dist/site (the cart on the browser preview player) and publishes it
-# to GitHub Pages. Enable it once under Settings → Pages → Source: GitHub Actions.
+# to GitHub Pages at https://<owner>.github.io/<repo>/ (Settings → Pages →
+# Source: GitHub Actions).
 
 on:
   push:

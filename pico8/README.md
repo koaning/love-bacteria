@@ -32,8 +32,9 @@ export a standalone `.p8.png`/HTML, load the cart in PICO-8 and `save` /
 Two calm chord loops with no lead melody: "sprout parade" (72 bpm) on the
 title screen (pattern 0) and "moss garden" (90 bpm) in game (pattern 4).
 Each is a plucked sine harp arpeggio over a bouncy triangle bass. They are
-written as chord charts in `tools/music.lua`, which compiles them into
-sfx 8+ and the `__music__` section of the cart:
+written as chord charts in `tools/scores.lua`, which `tools/sfx.lua` compiles
+into sfx 8+ and the `__music__` section of the cart (leaving hand-made sfx 0-7
+untouched):
 
 ```bash
 make music   # rewrite the cart's music data after editing the score
