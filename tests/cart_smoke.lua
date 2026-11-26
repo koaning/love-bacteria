@@ -14,9 +14,19 @@ local function boot(seed)
   local pressed = {}
   local cpu = 0
 
-  for _, name in ipairs({ "cls", "rectfill", "rect", "circfill", "circ", "line", "print", "sfx", "ovalfill", "pset" }) do
+  for _, name in ipairs({ "cls", "rectfill", "rect", "circfill", "circ", "line", "print", "sfx", "ovalfill", "pset", "fillp", "clip", "pal" }) do
     rawset(env, name, noop)
   end
+  rawset(env, "del", function(t, v)
+    for i = 1, #t do
+      if t[i] == v then return table.remove(t, i) end
+    end
+  end)
+  rawset(env, "ord", function(s, i) return string.byte(s, i or 1) end)
+  rawset(env, "mid", function(a, b, c)
+    if a > b then a, b = b, a end
+    return math.max(a, math.min(b, c))
+  end)
   rawset(env, "btnp", function(b) return pressed[b] == true end)
   rawset(env, "sin", function(a) return -math.sin(a * 2 * math.pi) end)
   rawset(env, "cos", function(a) return math.cos(a * 2 * math.pi) end)
