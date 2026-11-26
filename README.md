@@ -28,3 +28,12 @@ browser player needs:
 - `/`: the cart running on `pico8/preview/`, a small PICO-8 stand-in player
 - `/official/`: also included when the `pico8` binary is installed (real PICO-8 HTML export)
 
+## Development
+
+```bash
+make test        # brain unit tests, cart smoke test, token budget, sound check
+make screenshots # refresh docs/screenshots/ and the cart label (needs LÖVE)
+```
+
+More on the cart, controls, music and preview player in
+[pico8/README.md](pico8/README.md).

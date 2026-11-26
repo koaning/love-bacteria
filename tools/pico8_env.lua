@@ -1,13 +1,23 @@
--- Loads pico8/*.lua into a sandbox that only exposes PICO-8 builtins.
+-- Loads the cart's plain-logic files into a sandbox that only exposes PICO-8
+-- builtins, so tests can run the exact code the cart runs.
 --
--- This doubles as a dialect linter for the mirrored files:
+--   local pico8_env = require("pico8_env")      -- with tools/ on package.path
+--   local env = pico8_env.new(".", pico8_env.make_rng(1))
+--   env.rules_new() ...
+--
+-- By default it loads every file the cart #includes except main.lua (which
+-- needs the graphics and input API; tests/pico8_stub.lua boots that one).
+-- opts.files overrides the list, opts.globals adds extra globals (e.g. a
+-- hook main.lua normally defines that a logic file calls).
+--
+-- This doubles as a dialect linter for those files:
 --   * PICO-8-only syntax (+=, !=, ?) fails to parse under LuaJIT.
 --   * Touching math./table./string./ipairs/require raises an error, because
 --     those globals don't exist on PICO-8 either.
 
-local Env = {}
+local find_cart = require("cart")
 
-local MIRRORED_FILES = { "board.lua", "rules.lua", "ai.lua" }
+local Env = {}
 
 local function pico_all(t)
   local i = 0
@@ -26,10 +36,23 @@ local function pico_deli(t, i)
   return table.remove(t, i or #t)
 end
 
+-- the files the cart #includes, in order, except main.lua
+function Env.logic_files(root)
+  local f = assert(io.open(find_cart(root), "r"))
+  local src = f:read("*a")
+  f:close()
+  local files = {}
+  for name in (src:match("__lua__\n(.-)\n__%a+__") or ""):gmatch("#include%s+(%S+)") do
+    if name ~= "main.lua" then files[#files + 1] = name end
+  end
+  return files
+end
+
 -- rng(n) must return an integer in 1..n. PICO-8 code does flr(rnd(n)) + 1,
--- so rnd(n) hands back rng(n) - 1 to consume the exact same sequence the LÖVE
--- side consumes through love.math.random(n).
-function Env.new(root, rng)
+-- so rnd(n) hands back rng(n) - 1, which keeps test runs deterministic.
+function Env.new(root, rng, opts)
+  root = root or "."
+  opts = opts or {}
   local env = {
     all = pico_all,
     add = pico_add,
@@ -40,7 +63,7 @@ function Env.new(root, rng)
     max = math.max,
     min = math.min,
     sqrt = math.sqrt,
-    sub = function(s, i, j) return string.sub(s, i, j or i) end,
+    sub = function(s, i, j) return string.sub(s, i, j or -1) end,
     tostr = tostring,
     tonum = tonumber,
     pairs = pairs,
@@ -51,8 +74,8 @@ function Env.new(root, rng)
       end
       return rng(n) - 1
     end,
-    ai_tick = function() end,
   }
+  for k, v in pairs(opts.globals or {}) do env[k] = v end
 
   setmetatable(env, {
     __index = function(_, key)
@@ -61,12 +84,12 @@ function Env.new(root, rng)
     end,
   })
 
-  for _, name in ipairs(MIRRORED_FILES) do
+  for _, name in ipairs(opts.files or Env.logic_files(root)) do
     local path = root .. "/pico8/" .. name
     local chunk, err = loadfile(path)
     if not chunk then
       error("could not load " .. path .. " under LuaJIT -- is it using "
-        .. "PICO-8-only syntax (+=, !=, ?) in a mirrored file?\n" .. err)
+        .. "PICO-8-only syntax (+=, !=, ?)?\n" .. err)
     end
     setfenv(chunk, env)
     chunk()
@@ -75,7 +98,7 @@ function Env.new(root, rng)
   return env
 end
 
--- Deterministic LCG so both brains can be fed identical "random" numbers.
+-- Deterministic LCG for reproducible "random" numbers in tests.
 function Env.make_rng(seed)
   local s = seed
   return function(n)

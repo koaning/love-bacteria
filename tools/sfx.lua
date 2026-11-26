@@ -1,54 +1,51 @@
--- Mossballs background music: readable scores compiled into the cart's
--- __sfx__ (slots 8+) and __music__ sections.
+-- Sound compiler: the readable scores in tools/scores.lua (game-owned)
+-- compiled into the cart's __sfx__ and __music__ sections.
 --
---   luajit tools/music.lua              rewrite pico8/mossballs.p8
---   luajit tools/music.lua --check      fail if the cart is out of date
+--   luajit tools/sfx.lua [cart.p8]            rewrite the cart (`make music`)
+--   luajit tools/sfx.lua [cart.p8] --check    fail if the cart is out of date
 --
--- Two calm, original chord loops with nods to classic adventure and
--- platformer soundtracks (maj7 voicings, borrowed minor chords, bVII lifts):
---   title  "sprout parade"  music(0)  F major, 72 bpm
---   game   "moss garden"    music(G)  C major, 90 bpm
--- No lead melody: a soft plucked sine harp arpeggio on channel 0 and a
--- root/fifth triangle bass on channel 1. Channels 2-3 stay free for sfx.
+-- tools/scores.lua returns a table:
+--
+--   first_sfx  sfx 0..first_sfx-1 are sound effects, music uses first_sfx+
+--   effects    list of { name, speed, notes } compiled into sfx 0, 1, ...;
+--              leave it out to keep the cart's own sfx 0..first_sfx-1 (made
+--              in PICO-8's editor) untouched
+--   songs      list of { name, title, speed, patterns, order }; each loops
+--              on itself, and the check makes sure pico8/main.lua calls
+--              music(<first pattern>, ...) for every song
+--   harp, bass optional voices for the song arranger: { wave, vol }
+--
+-- Effect notes are "pitch:wave:volume:effect" tokens, "-" for a rest, up to
+-- 32 per effect. Pitches are PICO-8 tracker notes (c0 is the lowest; c#2,
+-- a3, ...). Waves: 0 sine, 1 triangle, 2 saw, 3 square, 4 pulse, 5 organ,
+-- 6 noise, 7 phaser. Effects: 0 none, 1 slide, 2 vibrato, 3 drop, 4 fade in,
+-- 5 fade out.
+--
+-- Song patterns are four bars of chords: one per bar ("gmaj7"), or two
+-- sharing a bar ("dsus4/d7"). Chord qualities: maj7 m7 7 6 m6 sus4 maj. Each
+-- pattern becomes a plucked harp arpeggio (channel 0) and a root/fifth bass
+-- (channel 1); channels 2-3 stay free for sound effects.
 
-local CART = "pico8/mossballs.p8"
-local FIRST_SFX = 8
+package.path = "tools/?.lua;" .. package.path
 
-local HARP = { wave = 0, vol = 3 }
-local BASS = { wave = 1, vol = 4 }
+local args = {}
+local check = false
+for _, a in ipairs(arg) do
+  if a == "--check" then check = true else args[#args + 1] = a end
+end
+local CART = args[1] or require("cart")()
+local scores = dofile("tools/scores.lua")
+local FIRST_SFX = assert(scores.first_sfx, "tools/scores.lua: first_sfx is missing")
+local effects = scores.effects
+local songs = scores.songs or {}
 
--------------------------------------------------------------------------------
--- score
--------------------------------------------------------------------------------
--- Four bars per pattern. Chords: one per bar, or two "a/b" sharing the bar.
+local HARP = scores.harp or { wave = 0, vol = 3 }
+local BASS = scores.bass or { wave = 1, vol = 4 }
+
 local chord_tones = {
   maj7 = { 0, 4, 7, 11 }, m7 = { 0, 3, 7, 10 }, ["7"] = { 0, 4, 7, 10 },
   ["6"] = { 0, 4, 7, 9 }, m6 = { 0, 3, 7, 9 }, sus4 = { 0, 5, 7, 12 },
   maj = { 0, 4, 7, 12 },
-}
-
-local songs = {
-  {
-    name = "title", title = "sprout parade", speed = 50,
-    patterns = {
-      a = { "fmaj7", "dm7", "gm7", "c7" },
-      a2 = { "fmaj7", "dm7", "a#maj7/a#m6", "fmaj7/c7" },
-      b = { "a#maj7", "am7", "d7", "gm7/c7" },
-      coda = { "fmaj7", "dm7", "gm7/c7", "fmaj" },
-    },
-    order = { "a", "a2", "b", "coda" },
-  },
-  {
-    name = "game", title = "moss garden", speed = 40,
-    patterns = {
-      a = { "cmaj7", "fmaj7", "cmaj7", "dm7/g7" },
-      a2 = { "cmaj7", "fmaj7", "am7/fm6", "dm7/g7" },
-      b = { "fmaj7", "em7", "dm7", "cmaj7" },
-      b2 = { "a#maj7", "fmaj7", "a#maj7", "gsus4/gmaj" },
-      coda = { "cmaj7", "fmaj7", "a#maj7/fmaj7", "cmaj" },
-    },
-    order = { "a", "a2", "b", "b2", "a", "coda" },
-  },
 }
 
 -------------------------------------------------------------------------------
@@ -58,6 +55,7 @@ local semis = { c = 0, d = 2, e = 4, f = 5, g = 7, a = 9, b = 11 }
 
 local function parse_chord(c)
   local root, acc, q = c:match("^(%a)(#?)(.*)$")
+  assert(root and semis[root], "bad chord " .. c)
   return semis[root] + (acc == "#" and 1 or 0), assert(chord_tones[q], "bad chord " .. c)
 end
 
@@ -106,6 +104,24 @@ local function compile_backing(chords)
   return harp, bass
 end
 
+-- "c#3:1:5:0" style notes into sfx note tables
+local function compile_effect(e)
+  local notes = blank()
+  local i = 0
+  for tok in e.notes:gmatch("%S+") do
+    i = i + 1
+    assert(i <= 32, e.name .. " has more than 32 notes")
+    if tok ~= "-" then
+      local name, acc, oct, w, v, fx = tok:match("^(%a)(#?)(%d):(%d):(%d):(%d)$")
+      assert(name and semis[name], "bad note " .. tok .. " in " .. e.name)
+      local pitch = semis[name] + (acc == "#" and 1 or 0) + 12 * tonumber(oct)
+      assert(pitch <= 63, "note too high in " .. e.name)
+      notes[i] = { pitch = pitch, wave = tonumber(w), vol = tonumber(v), fx = tonumber(fx) }
+    end
+  end
+  return notes
+end
+
 local function sfx_line(notes, speed)
   local s = string.format("00%02x0000", speed)
   for _, n in ipairs(notes) do
@@ -147,10 +163,16 @@ end
 -- cart i/o
 -------------------------------------------------------------------------------
 local function read(path)
-  local f = assert(io.open(path, "rb"))
+  local f = assert(io.open(path, "rb"), "cannot open " .. path)
   local s = f:read("*a")
   f:close()
   return s
+end
+
+local function lines(s)
+  local t = {}
+  for l in (s or ""):gmatch("[^\n]+") do t[#t + 1] = l end
+  return t
 end
 
 local function split_sections(src)
@@ -171,24 +193,33 @@ local function split_sections(src)
   return table.concat(head, "\n") .. "\n", sections, order
 end
 
-local function lines(s)
-  local t = {}
-  for l in (s or ""):gmatch("[^\n]+") do t[#t + 1] = l end
-  return t
-end
-
 local function updated_cart(src, sfx, music)
   local head, sections, order = split_sections(src)
   local old = lines(sections.sfx)
   local empty = "00010000" .. string.rep("00000", 32)
   local out = {}
-  for i = 1, FIRST_SFX do out[i] = old[i] or empty end
+  if effects then
+    assert(#effects <= FIRST_SFX, "more sound effects than first_sfx slots")
+    for i = 1, FIRST_SFX do
+      local e = effects[i]
+      out[i] = e and sfx_line(compile_effect(e), e.speed) or empty
+    end
+  else
+    for i = 1, FIRST_SFX do out[i] = old[i] or empty end
+  end
   for i, l in ipairs(sfx) do out[FIRST_SFX + i] = l end
+  local function ensure(name)
+    for _, n in ipairs(order) do
+      if n == name then return end
+    end
+    order[#order + 1] = name
+  end
   sections.sfx = table.concat(out, "\n")
-  sections.music = table.concat(music, "\n")
-  local has_music = false
-  for _, n in ipairs(order) do has_music = has_music or n == "music" end
-  if not has_music then order[#order + 1] = "music" end
+  ensure("sfx")
+  if #music > 0 then
+    sections.music = table.concat(music, "\n")
+    ensure("music")
+  end
   local parts = { head }
   for _, n in ipairs(order) do
     parts[#parts + 1] = "__" .. n .. "__\n" .. sections[n] .. "\n"
@@ -200,18 +231,22 @@ local sfx, music, starts = build(songs)
 local src = read(CART)
 local new = updated_cart(src, sfx, music)
 
-if arg[1] == "--check" then
+if check then
   if new ~= src then
-    io.stderr:write("pico8/mossballs.p8 music is stale: run `make music`\n")
+    io.stderr:write(CART .. " sound is stale: run `make music`\n")
     os.exit(1)
   end
   local main = read("pico8/main.lua")
-  if not main:find("music%(" .. starts.game .. ",") then
-    io.stderr:write("pico8/main.lua should call music(" .. starts.game .. ", ...) for the game song\n")
-    os.exit(1)
+  for _, song in ipairs(songs) do
+    local n = starts[song.name]
+    if not main:find("music%(" .. n .. "[,%)]") then
+      io.stderr:write("pico8/main.lua should call music(" .. n .. ", ...) for the song "
+        .. song.name .. "\n")
+      os.exit(1)
+    end
   end
-  print(string.format("music  %d patterns (game starts at %d), sfx %d-%d, up to date",
-    #music, starts.game, FIRST_SFX, FIRST_SFX + #sfx - 1))
+  print(string.format("sound  %d effects, %d songs, %d music patterns, up to date",
+    effects and #effects or 0, #songs, #music))
 else
   if new ~= src then
     local f = assert(io.open(CART, "wb"))
@@ -219,5 +254,7 @@ else
     f:close()
     print("updated " .. CART)
   end
-  print("game music starts at pattern " .. starts.game)
+  for _, song in ipairs(songs) do
+    print(string.format("%-10s starts at music pattern %d", song.name, starts[song.name]))
+  end
 end

@@ -210,7 +210,7 @@ table.sort(names)
 
 local passed = 0
 for _, name in ipairs(names) do
-  local env = pico8_env.new(".", pico8_env.make_rng(1))
+  local env = pico8_env.new(".", pico8_env.make_rng(1), { globals = { ai_tick = function() end } })
   tests[name](env)
   print("PASS " .. name)
   passed = passed + 1
