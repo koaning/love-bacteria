@@ -1,6 +1,5 @@
 dist/
 .DS_Store
-love/assets/audio/music/demos/
-love/web/lovejs/*
-!love/web/lovejs/README.md
+site/lovejs/*
+!site/lovejs/README.md
 conductor.json

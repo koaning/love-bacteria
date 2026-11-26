@@ -16,12 +16,8 @@ check() {
 
 echo "Checking Mossballs requirements:"
 check luajit "make test"
-if [ "$(uname -s)" = "Darwin" ] && [ -d /Applications/love.app ] && ! command -v love >/dev/null 2>&1; then
-  echo "  ok       love     /Applications/love.app (not on PATH; 'make run' needs it there)"
-else
-  check love "make run (LÖVE 11.5)"
-fi
-check zip "make love / build / web / appimage"
+check zip "make pico8-preview / site"
+check curl "make fetch-lovejs"
 
 if [ "$missing" -ne 0 ]; then
   echo "Some tools are missing; related make targets will fail until they are installed."

@@ -1,14 +1,12 @@
 -- Repo-wide test entry point: `luajit tests/run.lua` from the repo root.
--- (CI and the release workflow call this path; `make test` runs the same.)
+-- (CI calls this path; `make test` runs the same.)
 --
---   1. LÖVE unit tests         love/tests/run.lua
---   2. AI mirror match         tests/mirror_match.lua
---   3. PICO-8 cart smoke test  tests/cart_smoke.lua
---   4. PICO-8 token meter      tools/p8tokens.lua
+--   1. PICO-8 brain unit tests   tests/test_brain.lua
+--   2. PICO-8 cart smoke test    tests/cart_smoke.lua
+--   3. PICO-8 token meter        tools/p8tokens.lua
 
 local steps = {
-  { "LÖVE unit tests", "cd love && luajit tests/run.lua" },
-  { "AI mirror match", "luajit tests/mirror_match.lua" },
+  { "brain unit tests", "luajit tests/test_brain.lua" },
   { "cart smoke test", "luajit tests/cart_smoke.lua" },
   { "token meter", "luajit tools/p8tokens.lua" },
 }

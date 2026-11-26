@@ -3,76 +3,58 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Mossballs — pick an edition</title>
+    <title>Mossballs — PICO-8</title>
     <style>
       body {
         margin: 0;
         min-height: 100vh;
-        background: radial-gradient(circle at 30% 10%, #1d2b53, #0b0f1d 70%);
-        color: #fff1e8;
-        font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
+        background: #0b0f1d;
+        color: #c2c3c7;
+        font-family: system-ui, sans-serif;
         display: grid;
         place-items: center;
       }
-      main { width: min(94vw, 980px); padding: 32px 0; }
-      h1 { margin: 0 0 4px; font-size: clamp(2rem, 5vw, 3.2rem); letter-spacing: 0.06em; }
-      .lead { margin: 0 0 28px; color: #c2c3c7; }
-      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; }
-      a.card {
+      main { text-align: center; padding: 16px; }
+      a { color: #29adff; }
+      canvas {
+        width: min(90vw, 80vh, 640px) !important;
+        height: min(90vw, 80vh, 640px) !important;
+        image-rendering: pixelated;
         display: block;
-        text-decoration: none;
-        color: inherit;
-        background: rgba(255, 255, 255, 0.05);
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        border-radius: 16px;
-        overflow: hidden;
-        transition: transform 0.15s, border-color 0.15s;
+        margin: 12px auto;
+        border-radius: 6px;
+        box-shadow: 0 0 0 4px #1d2b53, 0 20px 60px rgba(0, 0, 0, 0.6);
       }
-      a.card:hover { transform: translateY(-3px); border-color: #29adff; }
-      .shot { aspect-ratio: 1 / 1; background: #000 center / cover no-repeat; }
-      .shot.love { background-image: url("shots/love.png"); aspect-ratio: 16 / 10; background-size: contain; background-color: #0b0f17; }
-      .shot.pico8 { background-image: url("shots/pico8.png"); image-rendering: pixelated; aspect-ratio: 16 / 10; background-size: contain; }
-      .body { padding: 14px 18px 18px; }
-      .body h2 { margin: 0 0 4px; font-size: 1.25rem; }
-      .body p { margin: 0; color: #c2c3c7; font-size: 0.95rem; }
-      .tag { display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 99px; font-size: 0.75rem; background: #ffa300; color: #1d2b53; vertical-align: middle; }
-      footer { margin-top: 24px; font-size: 0.85rem; color: #83769c; }
-      #official { display: none; }
+      .keys { font-size: 0.9rem; }
+      kbd { background: #1d2b53; color: #fff1e8; border-radius: 4px; padding: 1px 6px; }
+      .note { font-size: 0.8rem; color: #83769c; max-width: 640px; margin: 10px auto 0; }
+      #official { display: none; margin-bottom: 6px; font-size: 0.9rem; }
     </style>
   </head>
   <body>
     <main>
-      <h1>MOSSBALLS</h1>
-      <p class="lead">Grow, jump, convert. Same 7×7 dish, same bot brain, two bodies.</p>
-      <div class="cards">
-        <a class="card" href="love/">
-          <div class="shot love"></div>
-          <div class="body">
-            <h2>LÖVE edition</h2>
-            <p>The full-fat version: shaders, music, animations. Runs in the browser via love.js.</p>
-          </div>
-        </a>
-        <a class="card" href="pico8/">
-          <div class="shot pico8"></div>
-          <div class="body">
-            <h2>PICO-8 edition <span class="tag">preview player</span></h2>
-            <p>The 128×128 cart, running on a small PICO-8 stand-in written in LÖVE.</p>
-          </div>
-        </a>
-        <a class="card" id="official" href="pico8-official/">
-          <div class="shot pico8"></div>
-          <div class="body">
-            <h2>PICO-8 edition <span class="tag">official export</span></h2>
-            <p>The cart exported by the real PICO-8 web player.</p>
-          </div>
-        </a>
+      <div id="official"><a href="official/">Open official PICO-8 export →</a></div>
+      <div id="game"></div>
+      <div class="keys">
+        <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> move ·
+        <kbd>Z</kbd>/<kbd>C</kbd> = 🅾️ select / confirm ·
+        <kbd>X</kbd> = ❎ deselect · click the screen first
       </div>
-      <footer>Both bots are twin files kept in lockstep by <code>make mirror</code>.</footer>
+      <p class="note">
+        Preview player: a small PICO-8 stand-in (pico8/preview/) running the real cart files.
+        Colours, font and sound are approximations. CPU is budgeted like PICO-8's, so the
+        bot thinks about as long as it would on the real console.
+      </p>
     </main>
     <script>
-      fetch("pico8-official/index.html", { method: "HEAD" }).then(function (r) {
-        if (r.ok) document.getElementById("official").style.display = "block";
-      });
+      (function () {
+        var s = document.createElement("script");
+        s.src = "player.js?g=mossballs-p8.love&v=11.5&n=1";
+        document.getElementById("game").appendChild(s);
+        fetch("official/index.html", { method: "HEAD" }).then(function (r) {
+          if (r.ok) document.getElementById("official").style.display = "block";
+        });
+      })();
     </script>
   </body>
 </html>
