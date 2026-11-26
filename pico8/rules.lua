@@ -1,24 +1,6 @@
 -- rules.lua
 -- legal moves, conversion, automatic passing, and win detection.
 
-local adjacent_offsets = {
-  { x = -1, y = -1 },
-  { x = 0, y = -1 },
-  { x = 1, y = -1 },
-  { x = -1, y = 0 },
-  { x = 1, y = 0 },
-  { x = -1, y = 1 },
-  { x = 0, y = 1 },
-  { x = 1, y = 1 },
-}
-
-local jump_offsets = {
-  { x = 0, y = -2 },
-  { x = 2, y = 0 },
-  { x = 0, y = 2 },
-  { x = -2, y = 0 },
-}
-
 function other_side(side)
   if side == "player" then
     return "enemy"
@@ -27,49 +9,58 @@ function other_side(side)
   return "player"
 end
 
-local function add_move(moves, kind, fx, fy, tx, ty)
-  add(moves, {
-    kind = kind,
-    from = { x = fx, y = fy },
-    to = { x = tx, y = ty },
-  })
-end
+-- the first 8 offsets grow, the last 4 jump.
+local move_offsets = {
+  { x = -1, y = -1 },
+  { x = 0, y = -1 },
+  { x = 1, y = -1 },
+  { x = -1, y = 0 },
+  { x = 1, y = 0 },
+  { x = -1, y = 1 },
+  { x = 0, y = 1 },
+  { x = 1, y = 1 },
+  { x = 0, y = -2 },
+  { x = 2, y = 0 },
+  { x = 0, y = 2 },
+  { x = -2, y = 0 },
+}
 
 function rules_get_piece_moves(state, side, x, y)
   local moves = {}
 
-  if board_get_cell(state, x, y) ~= side then
-    return moves
-  end
+  if board_get_cell(state, x, y) == side then
+    for i = 1, 12 do
+      local o = move_offsets[i]
+      local nx = x + o.x
+      local ny = y + o.y
 
-  for offset in all(adjacent_offsets) do
-    local nx = x + offset.x
-    local ny = y + offset.y
-
-    if board_get_cell(state, nx, ny) == "empty" then
-      add_move(moves, "grow", x, y, nx, ny)
-    end
-  end
-
-  for offset in all(jump_offsets) do
-    local nx = x + offset.x
-    local ny = y + offset.y
-
-    if board_get_cell(state, nx, ny) == "empty" then
-      add_move(moves, "jump", x, y, nx, ny)
+      if board_get_cell(state, nx, ny) == "empty" then
+        add(moves, {
+          kind = i > 8 and "jump" or "grow",
+          from = { x = x, y = y },
+          to = { x = nx, y = ny },
+        })
+      end
     end
   end
 
   return moves
 end
 
+-- growing into a cell gives the same board whichever piece
+-- grows, so only the first grow per target cell is listed.
 function rules_get_legal_moves(state, side)
   local moves = {}
+  local seen = {}
 
   for y = 1, state.height do
     for x = 1, state.width do
-      if board_get_cell(state, x, y) == side then
-        for move in all(rules_get_piece_moves(state, side, x, y)) do
+      for move in all(rules_get_piece_moves(state, side, x, y)) do
+        -- jumps key on themselves, so they are never dropped
+        local k = move.kind == "grow" and move.to.y * 8 + move.to.x or move
+
+        if not seen[k] then
+          seen[k] = 1
           add(moves, move)
         end
       end
@@ -77,6 +68,36 @@ function rules_get_legal_moves(state, side)
   end
 
   return moves
+end
+
+-- mobility (every grow and jump) for both sides in one pass,
+-- cached on the state; board_set_cell() clears the cache.
+function rules_count_moves(state, side)
+  local n = state.mob
+
+  if not n then
+    n = { player = 0, enemy = 0 }
+
+    for y = 1, state.height do
+      for x = 1, state.width do
+        local c = state.cells[y][x]
+
+        if c ~= "empty" then
+          for o in all(move_offsets) do
+            local row = state.cells[y + o.y]
+
+            if row and row[x + o.x] == "empty" then
+              n[c] = n[c] + 1
+            end
+          end
+        end
+      end
+    end
+
+    state.mob = n
+  end
+
+  return n[side]
 end
 
 function rules_find_move(state, side, from_cell, to_cell)
@@ -118,9 +139,9 @@ function rules_apply_move(state, move)
 
   board_set_cell(next_state, move.to.x, move.to.y, side)
 
-  for offset in all(adjacent_offsets) do
-    local nx = move.to.x + offset.x
-    local ny = move.to.y + offset.y
+  for i = 1, 8 do
+    local nx = move.to.x + move_offsets[i].x
+    local ny = move.to.y + move_offsets[i].y
 
     if board_get_cell(next_state, nx, ny) == enemy then
       board_set_cell(next_state, nx, ny, side)
@@ -156,10 +177,7 @@ function rules_get_winner(state)
     return "player"
   end
 
-  local player_moves = rules_get_legal_moves(state, "player")
-  local enemy_moves = rules_get_legal_moves(state, "enemy")
-
-  if #player_moves == 0 and #enemy_moves == 0 then
+  if rules_count_moves(state, "player") + rules_count_moves(state, "enemy") == 0 then
     if player_count > enemy_count then
       return "player"
     end
@@ -174,8 +192,9 @@ function rules_get_winner(state)
   return nil
 end
 
+-- updates state in place (callers pass a fresh state) and returns it.
 function rules_resolve_state(state)
-  local next_state = board_clone_state(state)
+  local next_state = state
   local winner = rules_get_winner(next_state)
 
   if winner then
@@ -185,7 +204,7 @@ function rules_resolve_state(state)
 
   local active_side = next_state.current_player
 
-  if #rules_get_legal_moves(next_state, active_side) > 0 then
+  if rules_count_moves(next_state, active_side) > 0 then
     next_state.pass_count = 0
     return next_state
   end

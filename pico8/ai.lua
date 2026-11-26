@@ -8,7 +8,6 @@
 --     yield() from a coroutine and keep animating while the
 --     bot thinks. the test sandbox makes it a no-op.
 
-local hard_search_depth = 2
 local infinity = 32000
 local win_score = 10000
 
@@ -126,8 +125,8 @@ local function evaluate_state(state, perspective)
 
   local my_count = board_count_cells(state, perspective)
   local their_count = board_count_cells(state, opponent)
-  local my_moves = #rules_get_legal_moves(state, perspective)
-  local their_moves = #rules_get_legal_moves(state, opponent)
+  local my_moves = rules_count_moves(state, perspective)
+  local their_moves = rules_count_moves(state, opponent)
 
   return ((my_count - their_count) * 8)
     + (my_moves * 5)
@@ -153,8 +152,8 @@ function ai_score_move(state, side, move)
 
   local my_count = board_count_cells(simulated, side)
   local their_count = board_count_cells(simulated, opponent)
-  local my_moves = #rules_get_legal_moves(simulated, side)
-  local their_moves = #rules_get_legal_moves(simulated, opponent)
+  local my_moves = rules_count_moves(simulated, side)
+  local their_moves = rules_count_moves(simulated, opponent)
 
   return (converted * 100)
     + ((my_count - their_count) * 8)
@@ -196,43 +195,19 @@ local function minimax_score(state, perspective, depth, alpha, beta)
     return evaluate_state(state, perspective)
   end
 
-  if current_side == perspective then
-    local best = -infinity
-
-    for move in all(legal_moves) do
-      ai_tick()
-      local next_state = rules_resolve_state(rules_apply_move(state, move))
-      local score = minimax_score(next_state, perspective, depth - 1, alpha, beta)
-
-      if score > best then
-        best = score
-      end
-
-      if best > alpha then
-        alpha = best
-      end
-
-      if alpha >= beta then
-        break
-      end
-    end
-
-    return best
-  end
-
-  local best = infinity
+  local maxing = current_side == perspective
+  local best = maxing and -infinity or infinity
 
   for move in all(legal_moves) do
     ai_tick()
-    local next_state = rules_resolve_state(rules_apply_move(state, move))
-    local score = minimax_score(next_state, perspective, depth - 1, alpha, beta)
+    local score = minimax_score(rules_resolve_state(rules_apply_move(state, move)), perspective, depth - 1, alpha, beta)
 
-    if score < best then
-      best = score
-    end
-
-    if best < beta then
-      beta = best
+    if maxing then
+      best = max(best, score)
+      alpha = max(alpha, best)
+    else
+      best = min(best, score)
+      beta = min(beta, best)
     end
 
     if alpha >= beta then
@@ -243,13 +218,16 @@ local function minimax_score(state, perspective, depth, alpha, beta)
   return best
 end
 
-local function choose_lookahead_move(state, side, legal_moves, depth)
+-- 2-ply search. each root move only has to beat the best so far,
+-- so replies that already refute it are cut off (alpha = best - 1
+-- keeps exact scores for ties; scores are whole numbers).
+local function choose_lookahead_move(state, side, legal_moves)
   local best_move = nil
   local best_score = nil
 
   for move in all(legal_moves) do
     local next_state = rules_resolve_state(rules_apply_move(state, move))
-    local score = minimax_score(next_state, side, depth - 1, -infinity, infinity)
+    local score = minimax_score(next_state, side, 1, best_score and best_score - 1 or -infinity, infinity)
 
     if compare_moves(move, score, best_move, best_score) then
       best_move = move
@@ -296,5 +274,5 @@ function ai_choose_move(state, side, difficulty, history)
     return best_move
   end
 
-  return choose_lookahead_move(state, side, legal_moves, hard_search_depth)
+  return choose_lookahead_move(state, side, legal_moves)
 end

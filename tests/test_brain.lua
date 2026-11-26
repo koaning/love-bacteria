@@ -109,6 +109,30 @@ function tests.resolve_state_declares_winner_when_both_sides_are_stuck(env)
   assert_eq(resolved.winner, "enemy")
 end
 
+function tests.legal_moves_dedupe_grows_and_count_moves_counts_all(env)
+  local st = env.board_new_state(7, 7)
+  env.board_set_cell(st, 3, 3, "enemy")
+  env.board_set_cell(st, 4, 3, "enemy")
+  local total = 0
+  for y = 1, 7 do
+    for x = 1, 7 do
+      total = total + #env.rules_get_piece_moves(st, "enemy", x, y)
+    end
+  end
+  assert_eq(env.rules_count_moves(st, "enemy"), total)
+  local grows = {}
+  for _, m in ipairs(env.rules_get_legal_moves(st, "enemy")) do
+    if m.kind == "grow" then
+      local k = m.to.x .. "," .. m.to.y
+      assert_true(not grows[k], "duplicate grow to " .. k)
+      grows[k] = true
+    end
+  end
+  -- the count cache must be dropped when a cell changes
+  env.board_set_cell(st, 5, 3, "enemy")
+  assert_true(env.rules_count_moves(st, "enemy") ~= total, "stale move count after board_set_cell")
+end
+
 function tests.easy_bot_prefers_grow_moves(env)
   local st = env.level_load()
   st.current_player = "enemy"
