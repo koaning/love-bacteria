@@ -11,11 +11,11 @@ function love.conf(t)
     end
   end
 
-  t.identity = "sporeline"
+  t.identity = "mossballs"
   t.version = "11.5"
   t.console = false
 
-  t.window.title = "Sporeline"
+  t.window.title = "Mossballs"
   t.window.width = 700
   t.window.height = 700
   t.window.fullscreen = (not is_web) and (not windowed)

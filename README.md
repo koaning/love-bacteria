@@ -1,6 +1,6 @@
-# Sporeline
+# Mossballs
 
-A small bacteria strategy game, inspired by the bacteria puzzle from *The 7th
+A small marimo strategy game, inspired by the bacteria puzzle from *The 7th
 Guest*. It comes in two editions that share the same AI:
 
 | | Edition | Run |
@@ -53,7 +53,7 @@ Tests need `luajit`. The web build also needs `zip` and `curl`.
 
 ```
 love/        LÖVE edition (main.lua, src/, assets/, tests/, web/, build/)
-pico8/       PICO-8 edition (sporeline.p8 + #included .lua files)
+pico8/       PICO-8 edition (mossballs.p8 + #included .lua files)
 pico8/preview/  PICO-8 preview player (LÖVE) used for the web build
 site/        landing page + PICO-8 page templates for `make site`
 tests/       run.lua (runs everything), mirror_match.lua, cart_smoke.lua

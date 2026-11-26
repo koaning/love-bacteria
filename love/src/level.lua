@@ -2,7 +2,7 @@ local board = require("src.board")
 
 local Level = {}
 
--- Sporeline is always played on a 7x7 dish (both the LÖVE and PICO-8 editions).
+-- Mossballs is always played on a 7x7 dish (both the LÖVE and PICO-8 editions).
 Level.BOARD_SIZE = 7
 
 function Level.load()

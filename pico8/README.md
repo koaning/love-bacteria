@@ -1,14 +1,14 @@
-# Sporeline — PICO-8 edition
+# Mossballs — PICO-8 edition
 
 | Cartridge | Gameplay |
 | --- | --- |
 | ![PICO-8 cartridge](../docs/screenshots/pico8-cart.png) | ![PICO-8 gameplay](../docs/screenshots/pico8.png) |
 
 ```bash
-pico8 -run sporeline.p8     # or `make pico8` from the repo root
+pico8 -run mossballs.p8     # or `make pico8` from the repo root
 ```
 
-The cart is `sporeline.p8`, which `#include`s:
+The cart is `mossballs.p8`, which `#include`s:
 
 | File | What | Mirrors |
 | --- | --- | --- |
@@ -39,12 +39,12 @@ export a standalone `.p8.png`/HTML, load the cart in PICO-8 and `save` /
 ## Preview player (no PICO-8 needed)
 
 `preview/` is a small PICO-8 stand-in written in LÖVE. It reads
-`sporeline.p8`, resolves its `#include`s and runs the cart against a minimal
+`mossballs.p8`, resolves its `#include`s and runs the cart against a minimal
 PICO-8 API: 128×128 framebuffer, the 16-colour palette, shapes, a 3×5 font,
 buttons, coroutines, and a tiny synth for the `__sfx__` section.
 
 ```bash
-make pico8-preview && love dist/sporeline-p8.love   # desktop
+make pico8-preview && love dist/mossballs-p8.love   # desktop
 make serve                                          # browser, at /pico8/
 ```
 

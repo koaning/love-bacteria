@@ -21,7 +21,7 @@ local theme_pals = {
     p_txt = 3, e_txt = 4,
     bar_bg = 7, bar_rim = 13, bar_tick = 5,
     foot = 5,
-    logo_out = 1, diam_out = 1,
+    logo_top = 11, logo_bot = 3, logo_out = 5, plaque = true, diam_out = 1,
     dish_sh = 13, dish_rim = 5, dish_bg = 6, dish_dith = 7, dish_hi = 7,
     card_bg = 7, card_in = 6, card_hi = 7, card_lo = 13, card_sh = 13, card_div = 6,
     lbl_on = 1, lbl_off = 13, arr_on = 1, arr_off = 6,
@@ -41,7 +41,7 @@ local theme_pals = {
     p_txt = 11, e_txt = 9,
     bar_bg = 0, bar_rim = 1, bar_tick = 13,
     foot = 13,
-    logo_out = 0, diam_out = 7,
+    logo_top = 11, logo_bot = 3, logo_out = 0, plaque = false, diam_out = 7,
     dish_sh = 0, dish_rim = 13, dish_bg = 1, dish_dith = 0, dish_hi = 6,
     card_bg = 0, card_in = 1, card_hi = 13, card_lo = 1, card_sh = 0, card_div = 1,
     lbl_on = 7, lbl_off = 13, arr_on = 7, arr_off = 1,
@@ -70,16 +70,68 @@ local looks = {
 local dxs = { -1, 0, 1, -1, 1, -1, 0, 1 }
 local dys = { -1, -1, -1, 0, 0, 1, 1, 1 }
 
--- 4x5 (3x5 for i) pixel glyphs for the 2x title logo
+-- crisp 1px-resolution 9px-tall pixel glyphs for the title logo
 local logo_glyphs = {
-  s = { 4, "01111000011000011110" },
-  p = { 4, "11101001111010001000" },
-  o = { 4, "01101001100110010110" },
-  r = { 4, "11101001111010101001" },
-  e = { 4, "11111000111010001111" },
-  l = { 4, "10001000100010001111" },
-  i = { 3, "111010010010111" },
-  n = { 4, "10011101101110011001" },
+  m = { 9,
+    "110000011" ..
+    "111000111" ..
+    "111101111" ..
+    "110111011" ..
+    "110010011" ..
+    "110000011" ..
+    "110000011" ..
+    "110000011" ..
+    "110000011" },
+  o = { 7,
+    "0111110" ..
+    "1111111" ..
+    "1100011" ..
+    "1100011" ..
+    "1100011" ..
+    "1100011" ..
+    "1100011" ..
+    "1111111" ..
+    "0111110" },
+  s = { 7,
+    "0111110" ..
+    "1111111" ..
+    "1100000" ..
+    "1111110" ..
+    "0111111" ..
+    "0000011" ..
+    "0000011" ..
+    "1111111" ..
+    "0111110" },
+  b = { 7,
+    "1111100" ..
+    "1111110" ..
+    "1100011" ..
+    "1111100" ..
+    "1111110" ..
+    "1100011" ..
+    "1100011" ..
+    "1111110" ..
+    "1111100" },
+  a = { 7,
+    "0011100" ..
+    "0111110" ..
+    "1100011" ..
+    "1100011" ..
+    "1111111" ..
+    "1111111" ..
+    "1100011" ..
+    "1100011" ..
+    "1100011" },
+  l = { 6,
+    "110000" ..
+    "110000" ..
+    "110000" ..
+    "110000" ..
+    "110000" ..
+    "110000" ..
+    "110000" ..
+    "111111" ..
+    "111111" },
 }
 
 -- subtle ambient background spores (kept clear of hud/footer text)
@@ -770,52 +822,42 @@ end
 -- title screen
 -------------------------------------------------------------
 
-local function draw_logo(word, ox, oy, out_c)
-  -- draw 2x shaded pixel-art wordmark with dark outline
+local function draw_logo(word, ox, oy, pal)
+  -- draw crisp 1px-resolution 9px-tall pixel wordmark with 3d drop shadow
   local function render(dx, dy, flat_col)
     local cx = ox
     for k = 1, #word do
       local ch = sub(word, k, k)
       local g = logo_glyphs[ch]
       local w, bits = g[1], g[2]
-      for r = 0, 4 do
+      for r = 0, 8 do
         for c = 0, w - 1 do
           if sub(bits, r * w + c + 1, r * w + c + 1) == "1" then
-            local px = cx + c * 2 + dx
-            local py = oy + r * 2 + dy
-            if flat_col then
-              rectfill(px, py, px + 1, py + 1, flat_col)
-            else
-              local top_c = 11
-              local bot_c = 11
-              if r == 0 then
-                top_c = 7
-                bot_c = 11
-              elseif r == 3 then
-                top_c = 11
-                bot_c = 3
-              elseif r == 4 then
-                top_c = 3
-                bot_c = 3
+            local col = flat_col
+            if not col then
+              if pal.plaque and r == 0 then
+                col = 7
+              elseif r < 5 then
+                col = pal.logo_top
+              elseif r < 8 then
+                -- dithered mid-green so the lower shade feels lighter and softer
+                col = (c + r) % 2 == 0 and pal.logo_top or pal.logo_bot
+              else
+                col = pal.logo_bot
               end
-              line(px, py, px + 1, py, top_c)
-              line(px, py + 1, px + 1, py + 1, bot_c)
             end
+            pset(cx + c + dx, oy + r + dy, col)
           end
         end
       end
-      cx = cx + w * 2 + 2
+      cx = cx + w + 3
     end
   end
 
-  -- 1px outline + 2px vertical drop shadow
-  render(0, 2, out_c)
-  render(-1, 1, out_c)
-  render(1, 1, out_c)
-  render(-1, 0, out_c)
-  render(1, 0, out_c)
-  render(0, -1, out_c)
-  render(0, 1, out_c)
+  -- crisp bottom-right drop shadow (keeps letter counters wide open)
+  render(1, 2, pal.logo_out)
+  render(1, 1, pal.logo_out)
+  render(0, 1, pal.logo_out)
   render(0, 0, nil)
 end
 
@@ -837,20 +879,31 @@ end
 
 local function draw_title()
   local pal = th()
-  -- custom 2x logo centered at x=21 (width 86)
-  draw_logo("sporeline", 21, 14, pal.logo_out)
+  if pal.plaque then
+    -- warm wood banner plaque behind the green mossballs wordmark
+    rectfill(15, 11, 114, 27, pal.card_sh)
+    rectfill(15, 9, 112, 25, 4)
+    rectfill(14, 10, 113, 24, 4)
+    line(15, 9, 112, 9, 9)
+    line(14, 10, 14, 24, 5)
+    line(113, 10, 113, 24, 5)
+    line(15, 25, 112, 25, 5)
+  end
 
-  -- two-tone rivalry underline beneath logo
-  line(21, 29, 60, 29, 3)
-  line(21, 28, 60, 28, 11)
-  line(67, 29, 106, 29, 4)
-  line(67, 28, 106, 28, 9)
+  -- crisp 9px-tall logo centered at x=20 (width 87)
+  draw_logo("mossballs", 20, pal.plaque and 13 or 15, pal)
+
+  -- two-tone rivalry underline with clean breathing room below the banner
+  line(20, 34, 60, 34, 3)
+  line(20, 33, 60, 33, 11)
+  line(67, 34, 107, 34, 4)
+  line(67, 33, 107, 33, 9)
   -- tiny diamond centerpiece
-  pset(64, 27, pal.diam_out)
-  pset(63, 28, pal.diam_out)
-  pset(64, 28, 10)
-  pset(65, 28, pal.diam_out)
-  pset(64, 29, pal.diam_out)
+  pset(64, 32, pal.diam_out)
+  pset(63, 33, pal.diam_out)
+  pset(64, 33, 10)
+  pset(65, 33, pal.diam_out)
+  pset(64, 34, pal.diam_out)
 
   -- shallow 3d petri-dish stage for the hopping mossballs
   ovalfill(10, 58, 118, 72, pal.dish_sh)

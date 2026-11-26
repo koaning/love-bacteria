@@ -5,7 +5,7 @@ set -euo pipefail
 
 repo="koaning/love-bacteria"
 workflow="release.yml"
-artifact="Sporeline-x86_64.AppImage"
+artifact="Mossballs-x86_64.AppImage"
 branch="$(git branch --show-current)"
 head_sha="$(git rev-parse HEAD)"
 remote_sha="$(git ls-remote origin "refs/heads/${branch}" | awk '{print $1}')"

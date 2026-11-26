@@ -1,6 +1,6 @@
 # Agent notes
 
-This repo holds two editions of Sporeline: `love/` (LÖVE 11.5, the ambitious
+This repo holds two editions of Mossballs: `love/` (LÖVE 11.5, the ambitious
 graphics) and `pico8/` (PICO-8 cart). Read `MIRROR.md` first.
 
 - `love/src/ai.lua` ↔ `pico8/ai.lua`, `love/src/rules.lua` ↔ `pico8/rules.lua`,

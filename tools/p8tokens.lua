@@ -1,6 +1,6 @@
 -- Approximate PICO-8 token meter for the cart.
 --
--- Usage (repo root):  luajit tools/p8tokens.lua [pico8/sporeline.p8]
+-- Usage (repo root):  luajit tools/p8tokens.lua [pico8/mossballs.p8]
 --
 -- Follows the rules from the PICO-8 manual: every name, keyword, literal,
 -- operator and opening bracket is one token; comments, `,` `.` `:` `;` `::`
@@ -9,7 +9,7 @@
 -- this one is usually within a few percent and is good for spotting trends.
 
 local LIMIT = 8192
-local cart = arg[1] or "pico8/sporeline.p8"
+local cart = arg[1] or "pico8/mossballs.p8"
 local dir = cart:match("^(.*)/") or "."
 
 local function read(path)

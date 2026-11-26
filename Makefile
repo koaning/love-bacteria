@@ -32,19 +32,19 @@ run:
 	$(MAKE) -C love run
 
 pico8:
-	$(PICO8) -run pico8/sporeline.p8
+	$(PICO8) -run pico8/mossballs.p8
 
 # Package the PICO-8 preview player (pico8/preview, a LÖVE stand-in for
-# PICO-8) together with the cart into dist/sporeline-p8.love.
-# `love dist/sporeline-p8.love` plays it on the desktop.
+# PICO-8) together with the cart into dist/mossballs-p8.love.
+# `love dist/mossballs-p8.love` plays it on the desktop.
 pico8-preview:
 	rm -rf "$(P8_STAGE)"
 	mkdir -p "$(P8_STAGE)/cart"
 	cp pico8/preview/main.lua pico8/preview/conf.lua "$(P8_STAGE)/"
-	cp pico8/sporeline.p8 pico8/*.lua "$(P8_STAGE)/cart/"
-	rm -f "$(DIST)/sporeline-p8.love"
-	cd "$(P8_STAGE)" && zip -9 -q -r ../sporeline-p8.love .
-	@echo "Built $(DIST)/sporeline-p8.love"
+	cp pico8/mossballs.p8 pico8/*.lua "$(P8_STAGE)/cart/"
+	rm -f "$(DIST)/mossballs-p8.love"
+	cd "$(P8_STAGE)" && zip -9 -q -r ../mossballs-p8.love .
+	@echo "Built $(DIST)/mossballs-p8.love"
 
 # LÖVE packaging targets live in love/Makefile; outputs land in love/dist/.
 love build web fetch-lovejs:
@@ -55,8 +55,8 @@ love build web fetch-lovejs:
 appimage:
 	$(MAKE) -C love appimage
 	mkdir -p "$(DIST)"
-	cp love/dist/Sporeline-x86_64.AppImage "$(DIST)/Sporeline-x86_64.AppImage"
-	@echo "Copied to $(DIST)/Sporeline-x86_64.AppImage"
+	cp love/dist/Mossballs-x86_64.AppImage "$(DIST)/Mossballs-x86_64.AppImage"
+	@echo "Copied to $(DIST)/Mossballs-x86_64.AppImage"
 
 # One static site with both editions:
 #   /         landing page
@@ -69,7 +69,7 @@ site: web pico8-preview
 	cp site/index.html "$(SITE)/index.html"
 	cp -R love/dist/web "$(SITE)/love"
 	cp site/pico8.html "$(SITE)/pico8/index.html"
-	cp "$(DIST)/sporeline-p8.love" "$(SITE)/pico8/"
+	cp "$(DIST)/mossballs-p8.love" "$(SITE)/pico8/"
 	@for f in $(LOVEJS_FILES); do \
 		mkdir -p "$(SITE)/pico8/$$(dirname $$f)"; \
 		cp "$(LOVEJS_DIR)/$$f" "$(SITE)/pico8/$$f"; \
@@ -77,7 +77,7 @@ site: web pico8-preview
 	-cp docs/screenshots/*.png "$(SITE)/shots/" 2>/dev/null
 	@if command -v "$(PICO8)" >/dev/null 2>&1; then \
 		mkdir -p "$(SITE)/pico8-official"; \
-		"$(PICO8)" pico8/sporeline.p8 -export "$(abspath $(SITE))/pico8-official/index.html" \
+		"$(PICO8)" pico8/mossballs.p8 -export "$(abspath $(SITE))/pico8-official/index.html" \
 			&& echo "Exported official PICO-8 player to $(SITE)/pico8-official/"; \
 	else \
 		echo "($(PICO8) not found: skipping the official PICO-8 export; the preview player is still included)"; \

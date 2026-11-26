@@ -1034,7 +1034,7 @@ function Render.draw_main_menu(focused_button_id, menu_transition, pulse_time, a
 
   love.graphics.setFont(fonts.title)
   set_color(palette.text, transition)
-  love.graphics.printf("Sporeline", ui.panel.x, ui.panel.y + 34 + y_offset, ui.panel.width, "center")
+  love.graphics.printf("Mossballs", ui.panel.x, ui.panel.y + 34 + y_offset, ui.panel.width, "center")
   draw_audio_status_badge(width, height, audio_status, transition, 18)
 
   for _, button in ipairs(ui.buttons) do
